@@ -89,7 +89,9 @@ struct ComputeForceOp<
         amrex::Real total_drag = 0.0;
         for (int ip = 0; ip < npts; ++ip) {
             const auto& tmat = grid.orientation[ip];
-            // Effective velocity at the wing control point in local frame
+            // Effective velocity at the wing control point in the local frame
+            // (grid.vel) is saved as `veff`; the rotated velocity (wvel) gives
+            // the effective angle of attack, `aoa`, and is saved as `vrel`
             auto wvel = tmat & grid.vel[ip];
             // Set spanwise component to zero to get a pure 2D velocity
             wvel.y() = 0.0;
@@ -101,10 +103,11 @@ struct ComputeForceOp<
             amrex::Real cl, cd;
             aflookup(aoa, cl, cd);
 
-            // Assume unit chord
+            // Assume unit density
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
             const auto lift = qval * cl;
             const auto drag = qval * cd;
+
             // Determine unit vector parallel and perpendicular to velocity
             // vector
             const auto drag_dir = wvel.unit() & tmat;
