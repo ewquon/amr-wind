@@ -11,25 +11,24 @@ namespace amr_wind {
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE amrex::Real FatCore::operator()(
     const amrex::Real r,
-    const amrex::Real,
+    const amrex::Real /*unused*/,
     const amrex::Real z,
     const amrex::Real R,
     const amrex::Real Gamma,
-    const amrex::Real,
-    const amrex::Real,
-    const amrex::Real,
-    const int,
-    const int*,
-    const amrex::Real*,
-    const amrex::Real*) const
+    const amrex::Real /*unused*/,
+    const amrex::Real /*unused*/,
+    const amrex::Real /*unused*/,
+    const int /*unused*/,
+    const int* /*unused*/,
+    const amrex::Real* /*unused*/,
+    const amrex::Real* /*unused*/) const
 {
     amrex::Real Rsq = std::pow(R, 2);
     const amrex::Real ssq = std::pow(z, 2) + std::pow(r - R, 2);
-    if (ssq <= Rsq) {
+    if (ssq < Rsq) {
         return 0.54857674 * Gamma / Rsq * std::exp(-4 * ssq / (Rsq - ssq));
-    } else {
-        return 0.0;
     }
+    return 0.0;
 }
 
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE amrex::Real CollidingRings::operator()(
@@ -109,7 +108,9 @@ void VortexRing::post_init_actions()
 {
 
     // only call for startup and not for restart
-    if (m_sim.time().time_index() > 0) return;
+    if (m_sim.time().time_index() > 0) {
+        return;
+    }
 
     if (m_vortexringtype == "fatcore") {
         initialize_velocity(FatCore());
@@ -187,7 +188,7 @@ void VortexRing::initialize_velocity(const VortexRingType& vorticity_theta)
     }
 
     amrex::LPInfo info;
-    auto& mesh = m_velocity.repo().mesh();
+    const auto& mesh = m_velocity.repo().mesh();
 
     amrex::MLNodeLaplacian linop(
         mesh.Geom(0, mesh.finestLevel()), mesh.boxArray(0, mesh.finestLevel()),
@@ -234,7 +235,9 @@ void VortexRing::initialize_velocity(const VortexRingType& vorticity_theta)
     const amrex::Real rel_tol = 1.0e-13;
     const amrex::Real abs_tol = 1.0e-13;
 
-    (*vectorpotential)(0).setVal(0.0, 0, AMREX_SPACEDIM, 1);
+    for (int level = 0; level <= m_repo.mesh().finestLevel(); ++level) {
+        (*vectorpotential)(level).setVal(0.0, 0, AMREX_SPACEDIM, 1);
+    }
 
     // might be able to skip z-dir since vorticity is 0.0
     for (int i = 0; i < AMREX_SPACEDIM; ++i) {

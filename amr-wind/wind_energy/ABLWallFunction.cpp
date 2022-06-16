@@ -46,18 +46,18 @@ ABLWallFunction::ABLWallFunction(const CFDSim& sim)
     } else if (pp.contains("surface_temp_rate")) {
         m_tempflux = false;
         pp.get("surface_temp_rate", m_surf_temp_rate);
-        if (pp.contains("surface_temp_init"))
+        if (pp.contains("surface_temp_init")) {
             pp.get("surface_temp_init", m_surf_temp_init);
-        else {
+        } else {
             amrex::Print()
                 << "ABLWallFunction: Initial surface temperature not found for "
                    "ABL. Assuming to be equal to the reference temperature "
                 << m_mo.ref_temp << std::endl;
             m_surf_temp_init = m_mo.ref_temp;
         }
-        if (pp.contains("surface_temp_rate_tstart"))
+        if (pp.contains("surface_temp_rate_tstart")) {
             pp.get("surface_temp_rate_tstart", m_surf_temp_rate_tstart);
-        else {
+        } else {
             amrex::Print()
                 << "ABLWallFunction: Surface temperature heating/cooling start "
                    "time (surface_temp_rate_tstart) not found for ABL. "
@@ -127,7 +127,8 @@ void ABLWallFunction::update_umean(
     m_mo.update_fluxes();
 }
 
-ABLVelWallFunc::ABLVelWallFunc(Field&, const ABLWallFunction& wall_func)
+ABLVelWallFunc::ABLVelWallFunc(
+    Field& /*unused*/, const ABLWallFunction& wall_func)
     : m_wall_func(wall_func)
 {
     amrex::ParmParse pp("ABL");
@@ -137,10 +138,10 @@ ABLVelWallFunc::ABLVelWallFunc(Field&, const ABLWallFunction& wall_func)
     if (m_wall_shear_stress_type == "constant" ||
         m_wall_shear_stress_type == "local" ||
         m_wall_shear_stress_type == "schumann" ||
-        m_wall_shear_stress_type == "moeng")
+        m_wall_shear_stress_type == "moeng") {
         amrex::Print() << "Shear Stress model: " << m_wall_shear_stress_type
                        << std::endl;
-    else {
+    } else {
         amrex::Abort("Shear Stress wall model input mistake");
     }
 }
@@ -152,7 +153,7 @@ void ABLVelWallFunc::wall_model(
     BL_PROFILE("amr-wind::ABLVelWallFunc");
 
     constexpr int idim = 2;
-    auto& repo = velocity.repo();
+    const auto& repo = velocity.repo();
     const auto& density = repo.get_field("density", rho_state);
     const auto& viscosity = repo.get_field("velocity_mueff");
     const int nlevels = repo.num_active_levels();
@@ -169,12 +170,14 @@ void ABLVelWallFunc::wall_model(
         const auto& domain = geom.Domain();
         amrex::MFItInfo mfi_info{};
 
-        auto& rho_lev = density(lev);
+        const auto& rho_lev = density(lev);
         auto& vold_lev = velocity.state(FieldState::Old)(lev);
         auto& vel_lev = velocity(lev);
-        auto& eta_lev = viscosity(lev);
+        const auto& eta_lev = viscosity(lev);
 
-        if (amrex::Gpu::notInLaunchRegion()) mfi_info.SetDynamic(true);
+        if (amrex::Gpu::notInLaunchRegion()) {
+            mfi_info.SetDynamic(true);
+        }
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif
@@ -256,7 +259,8 @@ void ABLVelWallFunc::operator()(Field& velocity, const FieldState rho_state)
     }
 }
 
-ABLTempWallFunc::ABLTempWallFunc(Field&, const ABLWallFunction& wall_fuc)
+ABLTempWallFunc::ABLTempWallFunc(
+    Field& /*unused*/, const ABLWallFunction& wall_fuc)
     : m_wall_func(wall_fuc)
 {
     amrex::ParmParse pp("ABL");
@@ -293,13 +297,15 @@ void ABLTempWallFunc::wall_model(
         const auto& domain = geom.Domain();
         amrex::MFItInfo mfi_info{};
 
-        auto& rho_lev = density(lev);
+        const auto& rho_lev = density(lev);
         auto& vold_lev = velocity.state(FieldState::Old)(lev);
         auto& told_lev = temperature.state(FieldState::Old)(lev);
         auto& theta = temperature(lev);
-        auto& eta_lev = alpha(lev);
+        const auto& eta_lev = alpha(lev);
 
-        if (amrex::Gpu::notInLaunchRegion()) mfi_info.SetDynamic(true);
+        if (amrex::Gpu::notInLaunchRegion()) {
+            mfi_info.SetDynamic(true);
+        }
 #ifdef _OPENMP
 #pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
 #endif

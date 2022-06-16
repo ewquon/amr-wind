@@ -25,8 +25,8 @@ void incflo::ReadCheckpointFile()
     amrex::Print() << "Restarting from checkpoint " << restart_file
                    << std::endl;
 
-    Real prob_lo[AMREX_SPACEDIM];
-    Real prob_hi[AMREX_SPACEDIM];
+    Real prob_lo[AMREX_SPACEDIM] = {0.0};
+    Real prob_hi[AMREX_SPACEDIM] = {0.0};
 
     /***************************************************************************
      * Load header: set up problem domain (including BoxArray)                 *
@@ -114,7 +114,7 @@ void incflo::ReadCheckpointFile()
 
     IntVect rep(1, 1, 1);
     for (int d = 0; d < AMREX_SPACEDIM; d++) {
-        AMREX_ALWAYS_ASSERT(prob_hi[d] > prob_lo[d]);
+        AMREX_ALWAYS_ASSERT(prob_hi[d] > prob_lo[d]); // NOLINT
 
         const amrex::Real domain_ratio =
             (prob_hi_input[d] - prob_lo_input[d]) / (prob_hi[d] - prob_lo[d]);
@@ -131,7 +131,7 @@ void incflo::ReadCheckpointFile()
         }
     }
 
-    bool replicate = (rep == IntVect::TheUnitVector()) ? false : true;
+    bool replicate = (rep != IntVect::TheUnitVector());
 
     if (replicate) {
         amrex::Print() << "replicating restart file: " << rep << std::endl;
@@ -194,7 +194,7 @@ void incflo::ReadCheckpointFile()
 
             for (int d = 0; d < AMREX_SPACEDIM; d++) {
                 auto new_domain = ba_rep.minimalBox();
-                auto hi_vect = new_domain.hiVect();
+                const auto* hi_vect = new_domain.hiVect();
 
                 if (hi_vect[d] + 1 != n_cell_input[d]) {
                     amrex::Abort(
