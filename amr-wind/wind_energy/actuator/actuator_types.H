@@ -57,6 +57,18 @@ struct ActSrcDisk : ActSrcType
     static constexpr bool is_disk = true;
 };
 
+///** Acutator surface / immersed thin interface representation.
+// *
+// *  \ingroup actuator
+// */
+//struct ActSrcSurf : ActSrcType
+//{
+//    static std::string identifier() { return "Surface"; }
+//
+//    static constexpr bool is_line = true;
+//    static constexpr bool is_disk = false;
+//};
+
 using RealList = amrex::Vector<amrex::Real>;
 using RealSlice = ::amr_wind::utils::Slice<amrex::Real>;
 using VecList = amrex::Vector<amr_wind::vs::Vector>;

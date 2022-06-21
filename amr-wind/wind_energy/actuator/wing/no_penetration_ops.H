@@ -1,17 +1,18 @@
-#ifndef WING_OPS_H
-#define WING_OPS_H
+#ifndef NO_PENETRATION_OPS_H
+#define NO_PENETRATION_OPS_H
 
-#include "amr-wind/wind_energy/actuator/wing/ActuatorWing.H"
-#include "amr-wind/wind_energy/actuator/actuator_types.H"
+#include "amr-wind/wind_energy/actuator/wing/NoPenetration.H"
 #include "amr-wind/wind_energy/actuator/actuator_ops.H"
-#include "amr-wind/wind_energy/actuator/aero/AirfoilTable.H"
-#include "amr-wind/wind_energy/actuator/ActParser.H"
+#include "amr-wind/utilities/linear_interpolation.H"
 
 namespace amr_wind {
 namespace actuator {
 namespace wing {
 
 /** Parse common data for modeling fixed wings as actuators
+
+    Copied from wing_ops.H
+    vvvvvvvvvvvvvvvvvvvvvv
  */
 void read_inputs(
     WingBaseData& /*wdata*/, ActInfo& /*info*/, const utils::ActParser& /*pp*/);
@@ -35,11 +36,98 @@ void write_netcdf(
 
 } // namespace wing
 
+
+/** NoPenetration actuator specific
+    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+ */
 namespace ops {
 
-template <typename T>
-const typename AirfoilTraits<T>::AirfoilLookup&
-airfoil_lookup(typename T::DataType& data);
+template <>
+struct ReadInputsOp<NoPenetration, ActSrcLine>
+{
+    void operator()(NoPenetration::DataType& data, const utils::ActParser& pp)
+    {
+        auto& wdata = data.meta();
+        auto& info = data.info();
+        pp.get("num_span_points", wdata.num_pts);
+        pp.get("num_chord_points", wdata.num_chord_pts);
+        pp.get("start", wdata.start);
+        pp.get("end", wdata.end);
+        pp.query("epsilon", wdata.eps_inp);
+        pp.query("epsilon_chord", wdata.epsilon_chord);
+        pp.get("pitch", wdata.pitch);
+        pp.queryarr("span_locs", wdata.span_locs);
+        pp.queryarr("chord", wdata.chord_inp);
+
+        if (!pp.contains("epsilon") && !pp.contains("epsilon_chord")) {
+            amrex::Abort(
+                "Actuator fixed wing requires specification of one or both "
+                "of 'epsilon' or 'epsilon_chord'");
+        }
+
+        AMREX_ALWAYS_ASSERT(wdata.span_locs.size() == wdata.chord_inp.size());
+
+        amrex::Real max_chord =
+            *std::max_element(wdata.chord_inp.begin(), wdata.chord_inp.end());
+        amrex::Real max_eps =
+            *std::max_element(wdata.eps_inp.begin(), wdata.eps_inp.end());
+        amrex::Real max_epsc = *std::max_element(
+            wdata.epsilon_chord.begin(), wdata.epsilon_chord.end());
+        amrex::Real search_radius =
+            amrex::max(max_eps, max_epsc) * max_chord * 3.0;
+        const auto& p1 = wdata.start;
+        const auto& p2 = wdata.end;
+        // clang-format off
+        info.bound_box = amrex::RealBox(
+            amrex::min(p1.x(), p2.x()) - search_radius,
+            amrex::min(p1.y(), p2.y()) - search_radius,
+            amrex::min(p1.z(), p2.z()) - search_radius,
+            amrex::max(p1.x(), p2.x()) + search_radius,
+            amrex::max(p1.y(), p2.y()) + search_radius,
+            amrex::max(p1.z(), p2.z()) + search_radius
+        );
+        // clang-format on
+    }
+};
+
+template <>
+struct InitDataOp<NoPenetration, ActSrcLine>
+{
+    void operator()(NoPenetration::DataType& data)
+    {
+        wing::init_data_structures(data.meta(), data.grid());
+
+        auto& meta = data.meta();
+        {
+            const int npts = data.meta().num_pts;
+            auto& grid = data.grid();
+            // Process chord information
+            const auto wlen = vs::mag(grid.pos.back() - grid.pos.front());
+            RealList wx(npts);
+            for (int i = 0; i < npts; ++i) {
+                wx[i] = vs::mag(grid.pos[i]) / wlen;
+            }
+            meta.chord.resize(npts);
+            ::amr_wind::interp::linear_monotonic(
+                meta.span_locs, meta.chord_inp, wx, meta.chord);
+            // clang-format off
+            meta.epsilon_chord = {
+                meta.epsilon_chord.x(), meta.epsilon_chord.z(),
+                meta.epsilon_chord.y()};
+            // clang-format on
+            for (int i = 0; i < npts; ++i) {
+                for (int n = 0; n < AMREX_SPACEDIM; ++n) {
+                    const auto eps = meta.epsilon_chord[n] * meta.chord[i];
+                    grid.epsilon[i][n] = amrex::max(meta.eps_inp[n], eps);
+                }
+            }
+        }
+    }
+};
+
+/* Copied from wing_ops.H -- removed airfoil lookup from ComputeForceOp
+   vvvvvvvvvvvvvvvvvvvvvv
+*/
 
 template <typename ActTrait, typename SrcTrait>
 struct UseDefaultOp
@@ -87,7 +175,6 @@ struct ComputeForceOp<
         const int npts = wdata.num_pts;
         const auto& dx = wdata.dx;
         const auto& chord = wdata.chord;
-        const auto& aflookup = airfoil_lookup<ActTrait>(data);
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
@@ -103,7 +190,8 @@ struct ComputeForceOp<
 
             // Calculate Cl, Cd
             amrex::Real cl, cd;
-            aflookup(aoa, cl, cd);
+            cl = ::amr_wind::utils::two_pi() * aoa; // PLACEHOLDER
+            cd = 0.0; // PLACEHOLDER
 
             // Assume unit density
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
@@ -182,4 +270,4 @@ public:
 } // namespace actuator
 } // namespace amr_wind
 
-#endif /* WING_OPS_H */
+#endif /* NO_PENETRATION_OPS_H */

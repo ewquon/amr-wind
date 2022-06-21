@@ -4,4 +4,5 @@ target_sources(${amr_wind_lib_name}
   wing_ops.cpp
   FlatPlate.cpp
   FixedWing.cpp
+  NoPenetration.cpp
   )
