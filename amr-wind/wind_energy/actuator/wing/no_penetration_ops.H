@@ -176,6 +176,10 @@ struct ComputeForceOp<
         const auto& dx = wdata.dx;
         const auto& chord = wdata.chord;
 
+        const bool DEBUG = false;
+
+        amrex::Real dt = data.sim().time().deltaT();
+
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
         for (int ip = 0; ip < npts; ++ip) {
@@ -186,25 +190,37 @@ struct ComputeForceOp<
             wvel.y() = 0.0;
 
             const auto vmag = vs::mag(wvel);
-            const auto aoa = std::atan2(wvel.z(), wvel.x());
-
-            // Calculate Cl, Cd
+            const auto aoa = std::atan2(wvel.z(), wvel.x()); // not true angle of attack
             amrex::Real cl, cd;
-            cl = ::amr_wind::utils::two_pi() * aoa; // PLACEHOLDER
-            cd = 0.0; // PLACEHOLDER
 
-            // Assume unit density
-            const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = qval * cl;
-            const auto drag = qval * cd;
+            // Compute force on fluid to achieve no penetration
+            // assuming unit density
+            auto wvel_normal = wvel;
+            wvel_normal.x() = 0.0;
+            wvel_normal.y() = 0.0;
+            grid.force[ip] = -(wvel_normal & tmat) / dt;
 
-            // Determine unit vector parallel and perpendicular to velocity
-            // vector
+            if (DEBUG) {
+                amrex::Print(amrex::Print::AllProcs) << "act pt " << ip << ":"
+                    << " grid.ori=" << grid.orientation[ip]
+                    << " grid.vel=" << grid.vel[ip]
+                    //<< " lift_dir=" << lift_dir
+                    //<< " drag_dir=" << drag_dir
+                    << " wvel=" << wvel
+                    << " force=" << grid.force[ip]
+                    << std::endl;
+            }
+
+            // Determine unit vector parallel and perpendicular to velocity vector
             const auto drag_dir = wvel.unit() & tmat;
             const auto lift_dir = drag_dir ^ tmat.y();
 
-            // Compute force on fluid from this section of wing
-            grid.force[ip] = -(lift_dir * lift + drag * drag_dir);
+            // Compute lift, drag assuming unit density
+            const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
+            const auto lift = 0.0; //qval * cl;
+            const auto drag = 0.0; //qval * cd;
+            cl = lift / qval;
+            cd = drag / qval;
 
             // Assign values for output
             wdata.vel_rel[ip] = wvel;
