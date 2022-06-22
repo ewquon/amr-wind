@@ -14,6 +14,8 @@ struct NoPenetrationData : public WingBaseData
     RealList span_locs{0.0, 1.0};
     RealList chord_inp{1.0, 1.0};
 
+    amrex::Real gain = 1.0;
+
     vs::Vector epsilon_chord;
 };
 

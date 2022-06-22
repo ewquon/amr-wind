@@ -53,6 +53,7 @@ struct ReadInputsOp<NoPenetration, ActSrcLine>
         pp.get("num_chord_points", wdata.num_chord_pts);
         pp.get("start", wdata.start);
         pp.get("end", wdata.end);
+        pp.query("gain", wdata.gain);
         pp.query("epsilon", wdata.eps_inp);
         pp.query("epsilon_chord", wdata.epsilon_chord);
         pp.get("pitch", wdata.pitch);
@@ -198,7 +199,7 @@ struct ComputeForceOp<
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
             wvel_normal.y() = 0.0;
-            grid.force[ip] = -(wvel_normal & tmat) / dt;
+            grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt;
 
             if (DEBUG) {
                 amrex::Print(amrex::Print::AllProcs) << "act pt " << ip << ":"
