@@ -199,6 +199,8 @@ struct ComputeForceOp<
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
             wvel_normal.y() = 0.0;
+            //force_local = wdata.gain * -wvel_normal / dt;
+            //grid.force[ip] = force_local & tmat;
             grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt;
 
             if (DEBUG) {
@@ -218,8 +220,8 @@ struct ComputeForceOp<
 
             // Compute lift, drag assuming unit density
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = 0.0; //qval * cl;
-            const auto drag = 0.0; //qval * cd;
+            const auto lift = 0.0; // force_local[2]
+            const auto drag = 0.0; // force_local[0]
             cl = lift / qval;
             cd = drag / qval;
 
