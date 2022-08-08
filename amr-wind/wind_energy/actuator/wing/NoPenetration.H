@@ -2,7 +2,6 @@
 #define NO_PENETRATION_H
 
 #include "amr-wind/wind_energy/actuator/wing/ActuatorWing.H"
-#include "amr-wind/wind_energy/actuator/aero/AirfoilTable.H"
 
 namespace amr_wind {
 namespace actuator {

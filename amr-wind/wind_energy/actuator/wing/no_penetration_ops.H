@@ -161,6 +161,11 @@ struct UpdateVelOp<
     void operator()(typename ActTrait::DataType& /*unused*/) {}
 };
 
+
+/** NoPenetration actuator specific
+    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+ */
+
 template <typename ActTrait>
 struct ComputeForceOp<
     ActTrait,
@@ -190,20 +195,20 @@ struct ComputeForceOp<
             // Set spanwise component to zero to get a pure 2D velocity
             wvel.y() = 0.0;
 
-            const auto vmag = vs::mag(wvel);
-            const auto aoa = std::atan2(wvel.z(), wvel.x()); // not true angle of attack
-            amrex::Real cl, cd;
-
             // Compute force on fluid to achieve no penetration
             // assuming unit density
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
-            wvel_normal.y() = 0.0;
+            wvel_normal.y() = 0.0; // don't need this
             //force_local = wdata.gain * -wvel_normal / dt;
             //grid.force[ip] = force_local & tmat;
             grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt;
 
             if (DEBUG) {
+                // Determine unit vector parallel and perpendicular to velocity vector
+                const auto drag_dir = wvel.unit() & tmat;
+                const auto lift_dir = drag_dir ^ tmat.y();
+
                 amrex::Print(amrex::Print::AllProcs) << "act pt " << ip << ":"
                     << " grid.ori=" << grid.orientation[ip]
                     << " grid.vel=" << grid.vel[ip]
@@ -214,11 +219,10 @@ struct ComputeForceOp<
                     << std::endl;
             }
 
-            // Determine unit vector parallel and perpendicular to velocity vector
-            const auto drag_dir = wvel.unit() & tmat;
-            const auto lift_dir = drag_dir ^ tmat.y();
-
-            // Compute lift, drag assuming unit density
+            // Compute 2-D lift, drag assuming unit density
+            amrex::Real cl, cd;
+            const auto vmag = vs::mag(wvel);
+            const auto aoa = std::atan2(wvel.z(), wvel.x());
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
             const auto lift = 0.0; // force_local[2]
             const auto drag = 0.0; // force_local[0]
