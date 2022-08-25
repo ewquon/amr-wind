@@ -182,16 +182,19 @@ struct ComputeForceOp<
         const auto& dx = wdata.dx;
         const auto& chord = wdata.chord;
 
-        const bool DEBUG = false;
+        const bool DEBUG = true;
 
         amrex::Real dt = data.sim().time().deltaT();
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
+
+	// for each actuator point
         for (int ip = 0; ip < npts; ++ip) {
+            // generate 3D rotation matrix to translate from grid velocity (inertial) frame to body frame
             const auto& tmat = grid.orientation[ip];
             // Effective velocity at the wing control point in local frame
-            auto wvel = tmat & grid.vel[ip];
+            auto wvel = tmat & grid.vel[ip]; // & functions as matrix-vector multiplication
             // Set spanwise component to zero to get a pure 2D velocity
             wvel.y() = 0.0;
 
@@ -200,9 +203,8 @@ struct ComputeForceOp<
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
             wvel_normal.y() = 0.0; // don't need this
-            //force_local = wdata.gain * -wvel_normal / dt;
-            //grid.force[ip] = force_local & tmat;
-            grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt;
+            auto force_local = wdata.gain * -wvel_normal / dt; // only use sfc-normal component to compute force
+            grid.force[ip] = force_local & tmat; // compute force in inertial frame (apply inverse rotation matrix)
 
             if (DEBUG) {
                 // Determine unit vector parallel and perpendicular to velocity vector
@@ -212,22 +214,22 @@ struct ComputeForceOp<
                 amrex::Print(amrex::Print::AllProcs) << "act pt " << ip << ":"
                     << " grid.ori=" << grid.orientation[ip]
                     << " grid.vel=" << grid.vel[ip]
-                    //<< " lift_dir=" << lift_dir
-                    //<< " drag_dir=" << drag_dir
                     << " wvel=" << wvel
-                    << " force=" << grid.force[ip]
+		    << " wvel_normal=" << wvel_normal
+		    << " dt=" << dt
+		    << " force_local=" << force_local
+		    << " force=" << grid.force[ip]
                     << std::endl;
             }
 
             // Compute 2-D lift, drag assuming unit density
-            amrex::Real cl, cd;
             const auto vmag = vs::mag(wvel);
             const auto aoa = std::atan2(wvel.z(), wvel.x());
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = 0.0; // force_local[2]
-            const auto drag = 0.0; // force_local[0]
-            cl = lift / qval;
-            cd = drag / qval;
+            const auto lift = force_local[2]; 
+            const auto drag = force_local[0]; 
+            const auto cl = lift / qval;
+            const auto cd = drag / qval;
 
             // Assign values for output
             wdata.vel_rel[ip] = wvel;
