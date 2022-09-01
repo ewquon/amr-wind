@@ -97,8 +97,25 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
             amrex::Print() << "  set scaling factor to " << m_scaleFact
                            << std::endl;
         }
-
     } // if forcing scheme is "indirect"
+    else if (amrex::toLower(m_forcing_scheme) == "gaussianprocess") {
+        pp.query("update_var_mat", m_update_var_mat);
+        pp.query("update_covar_mat", m_update_var_mat);
+        pp.query("update_freq", m_update_freq);
+        pp.query("covariance_function", m_covar_func);
+        if (amrex::toLower(m_covar_func) != "rbf") {
+            amrex::Print() << "  ignoring specified covariance function "
+                << m_covar_func << ", only RBF kernel is implemented"
+                << std::endl;
+        }
+        pp.query("length_scale", m_length_scale);
+        pp.query("sigma_noise", m_sigma_noise);
+        pp.query("specified_error", m_spec_err_type);
+        if ((amrex::toLower(m_spec_err_type) != "none") &&
+            (amrex::toLower(m_spec_err_type) != "forcing_variance")) {
+            amrex::Abort("Unrecognized specified_error type");
+        }
+    }
 }
 
 void ABLMesoscaleForcing::setTransitionWeighting()
@@ -285,4 +302,20 @@ void ABLMesoscaleForcing::blendForcings(
     }
 }
 
+// TODO: covariance function is hard-coded for now; can generalize the
+// following updateSigma* functions
+
+void updateSigma11(amrex::Vector<amrex::Real>& x1)
+{
+    // X1: ncfile.meso_heights() 
+    // X2: m_zht
+}
+
+void updateSigma12(amrex::Vector<amrex::Real>& x1)
+{
+    // X1: ncfile.meso_heights() 
+    // X2: m_zht
+}
+
 } // namespace amr_wind
+

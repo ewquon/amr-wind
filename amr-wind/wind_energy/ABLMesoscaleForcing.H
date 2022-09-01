@@ -85,18 +85,53 @@ protected:
     }
 
     // - slope varies linearly from the actual gradient of the forcing profile
-    // at m_transition_height
-    //   to 0 at (m_transition_height + m_transition_thicnkess)
+    //   at m_transition_height to 0 at (m_transition_height +
+    //   m_transition_thickness)
     void constantForcingTransition(amrex::Vector<amrex::Real>& error);
 
     // - blend between a lower and upper forcing profile; the blending fraction
-    // is assumed to be
-    //   equal to W(z), but this is not a requirement; W=1 and W=0 correspond to
-    //   the lower and upper profiles, respectively
+    //   is assumed to be equal to W(z), but this is not a requirement; W=1 and
+    //   W=0 correspond to the lower and upper profiles, respectively
     void blendForcings(
         const amrex::Vector<amrex::Real> lower,
         const amrex::Vector<amrex::Real> upper,
         amrex::Vector<amrex::Real>& error);
+
+    //
+    // Gaussian process (GP) regression
+    // 
+    // - "observations" are the direct forcing profiles to exactly reproduce
+    //   the profiles of the assimilated quantities
+    // - "predictions" are the resulting indirect forcing profiles, given
+    //   "noisy" obesrvations--i.e., forcing that we don't completely trust
+    //   in specified regions
+    //
+    bool m_update_var_mat = false; // update Sigma_11 at every time step
+    bool m_update_covar_mat = false; // update Sigma_12 at every time step
+    int m_update_freq = false; // how often to update (co)variance matrices
+    std::string m_covar_func = "RBF"; // covariance function (kernel)
+    amrex::Real m_length_scale = 1.0; // to scale covariance function
+    amrex::Real m_sigma_noise = 1.0; // standard deviation of the base error
+    std::string m_spec_err_type = "none"; // or "forcing_variance"
+
+    // lapack input/output data
+    double* Sigma11; // packed LHS matrix
+    double* Sigma12; // full RHS matrix
+
+    // - kernel of observations to predictions (Sigma12), row-major order; 
+    //   should only be called once (unless the input data heights change
+    //   over time
+    void updateSigma12(amrex::Vector<amrex::Real>& x1);
+
+    // - kernel of noisy observations (Sigma11) matrix, in upper triangular
+    //   form, row-major order; this needs to be updated if the specific error
+    //   is time-varying
+    void updateSigma11Packed(amrex::Vector<amrex::Real>& x1);
+
+    // - calculate the Gaussian process posterior (mean only, we are currently
+    //   not using the covariance in any way)
+    void GPPosteriorMean();
+
 };
 
 } // namespace amr_wind
