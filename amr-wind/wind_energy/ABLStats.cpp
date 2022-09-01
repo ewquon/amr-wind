@@ -33,6 +33,7 @@ ABLStats::ABLStats(
     , m_pa_vel(sim, dir)
     , m_pa_temp(m_temperature, sim.time(), dir)
     , m_pa_mueff(m_mueff, sim.time(), dir)
+    , m_pa_tt(m_pa_temp, m_pa_temp)
     , m_pa_tu(m_pa_vel, m_pa_temp)
     , m_pa_uu(m_pa_vel, m_pa_vel)
     , m_pa_uuu(m_pa_vel, m_pa_vel, m_pa_vel)
@@ -172,6 +173,7 @@ void ABLStats::post_advance_work()
         break;
     }
 
+    m_pa_tt();
     m_pa_tu();
     m_pa_uu();
     m_pa_uuu();
@@ -264,6 +266,9 @@ void ABLStats::write_ascii()
         time.current_time());
     m_pa_mueff.output_line_average_ascii(
         stat_dir + "/plane_average_velocity_mueff.txt", time.time_index(),
+        time.current_time());
+    m_pa_tt.output_line_average_ascii(
+        stat_dir + "/second_moment_temperature_temperature.txt", time.time_index(),
         time.current_time());
     m_pa_tu.output_line_average_ascii(
         stat_dir + "/second_moment_temperature_velocity.txt", time.time_index(),
@@ -390,6 +395,7 @@ void ABLStats::prepare_netcdf_file()
         grp.def_var("abl_meso_forcing_theta", NC_DOUBLE, two_dim);
     }
     grp.def_var("mueff", NC_DOUBLE, two_dim);
+    grp.def_var("theta'theta'_r", NC_DOUBLE, two_dim);
     grp.def_var("u'theta'_r", NC_DOUBLE, two_dim);
     grp.def_var("v'theta'_r", NC_DOUBLE, two_dim);
     grp.def_var("w'theta'_r", NC_DOUBLE, two_dim);
@@ -523,6 +529,12 @@ void ABLStats::write_netcdf()
         {
             auto var = grp.var("mueff");
             var.put(m_pa_mueff.line_average().data(), start, count);
+        }
+
+        {
+            auto var = grp.var("theta'theta'_r");
+            m_pa_tt.line_moment(0, l_vec);
+            var.put(l_vec.data(), start, count);
         }
 
         {
