@@ -36,7 +36,7 @@ ABLMesoForcingTemp::ABLMesoForcingTemp(const CFDSim& sim)
 
     if (!abl.abl_meso_file().is_tendency_forcing()) {
         mean_temperature_init(
-            abl.abl_statistics().theta_profile(), abl.abl_meso_file());
+            abl.abl_statistics().theta_profile_fine(), abl.abl_meso_file());
     } else {
         mean_temperature_init(abl.abl_meso_file());
     }
@@ -62,7 +62,7 @@ void ABLMesoForcingTemp::mean_temperature_init(const ABLMesoscaleInput& ncfile)
         ncfile.meso_heights().end(), m_meso_ht.begin());
 }
 void ABLMesoForcingTemp::mean_temperature_init(
-    const FieldPlaneAveraging& tavg, const ABLMesoscaleInput& ncfile)
+    const FieldPlaneAveragingFine& tavg, const ABLMesoscaleInput& ncfile)
 {
     m_axis = tavg.axis();
     // The implementation depends the assumption that the ABL statistics class
@@ -73,11 +73,11 @@ void ABLMesoForcingTemp::mean_temperature_init(
         m_mesh.Geom(0).Domain().length(m_axis) ==
         static_cast<int>(tavg.line_centroids().size()));
 
-    m_theta_ht.resize(tavg.line_centroids().size());
-    m_theta_vals.resize(tavg.ncell_line());
-
     m_nht = tavg.line_centroids().size();
     m_zht.resize(m_nht);
+
+    m_theta_ht.resize(tavg.line_centroids().size());
+    m_theta_vals.resize(tavg.ncell_line());
 
     m_err_Theta.resize(tavg.ncell_line());
 
@@ -151,7 +151,8 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
 }
 
 amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
-    const FieldPlaneAveraging& tavg, std::unique_ptr<ABLMesoscaleInput>& ncfile)
+    const FieldPlaneAveragingFine& tavg,
+    std::unique_ptr<ABLMesoscaleInput>& ncfile)
 {
 
     amrex::Real currtime;
@@ -206,8 +207,6 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
     }
 
     if (amrex::toLower(m_forcing_scheme) == "indirect") {
-        amrex::Print() << "mean_temperature_heights() : indirect forcing update"
-                       << std::endl;
         if (m_update_transition_height) {
             // ***FIXME***
             // unexpected behaviors, as described in

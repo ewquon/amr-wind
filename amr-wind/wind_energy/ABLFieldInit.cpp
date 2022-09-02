@@ -18,7 +18,7 @@ ABLFieldInit::ABLFieldInit()
 #ifndef AMR_WIND_USE_NETCDF
         amrex::Abort("initialization from profile capability requires NetCDF");
 #else
-        m_profile_height = true;
+        m_init_uvtheta_profile = true;
         std::string profileFile;
         pp_abl.query("init_profile", profileFile);
 
@@ -26,8 +26,7 @@ ABLFieldInit::ABLFieldInit()
             profileFile, NC_NOWRITE | NC_NETCDF4 | NC_MPIIO,
             amrex::ParallelContext::CommunicatorSub(), MPI_INFO_NULL);
 
-        int num_prof_val;
-        num_prof_val = ncf.dim("nheight").len();
+        int num_prof_val = ncf.dim("nheight").len();
 
         m_theta_heights.resize(num_prof_val);
         m_theta_values.resize(num_prof_val);
@@ -99,10 +98,6 @@ ABLFieldInit::ABLFieldInit()
     pp_abl.query("theta_amplitude", m_deltaT);
 
     pp_abl.query("init_tke", m_tke_init);
-<<<<<<< HEAD
-    amrex::ParmParse pp_incflo("incflo");
-    pp_incflo.get("density", m_rho);
-=======
 
     // TODO: Modify this to accept velocity as a function of height
     amrex::ParmParse pp_incflo("incflo");
@@ -122,17 +117,6 @@ ABLFieldInit::ABLFieldInit()
     } else {
         pp_incflo.getarr("velocity", m_vel);
     }
-
-    m_thht_d.resize(num_theta_values);
-    m_thvv_d.resize(num_theta_values);
-
-    amrex::Gpu::copy(
-        amrex::Gpu::hostToDevice, m_theta_heights.begin(),
-        m_theta_heights.end(), m_thht_d.begin());
-    amrex::Gpu::copy(
-        amrex::Gpu::hostToDevice, m_theta_values.begin(), m_theta_values.end(),
-        m_thvv_d.begin());
->>>>>>> 1deef92f64fac888e0932f8a5fdf7f52e3288715
 }
 
 void ABLFieldInit::operator()(
@@ -149,8 +133,6 @@ void ABLFieldInit::operator()(
 
     const bool perturb_vel = m_perturb_vel;
     const amrex::Real rho_init = m_rho;
-<<<<<<< HEAD
-=======
 
     const amrex::Real umean =
         !m_vel_timetable.empty() ? m_vel_speed * std::cos(m_vel_dir) : m_vel[0];
@@ -158,7 +140,6 @@ void ABLFieldInit::operator()(
         !m_vel_timetable.empty() ? m_vel_speed * std::sin(m_vel_dir) : m_vel[1];
     const amrex::Real wmean = !m_vel_timetable.empty() ? 0.0 : m_vel[2];
 
->>>>>>> 1deef92f64fac888e0932f8a5fdf7f52e3288715
     const amrex::Real aval = m_Uperiods * 2.0 * pi / (probhi[1] - problo[1]);
     const amrex::Real bval = m_Vperiods * 2.0 * pi / (probhi[0] - problo[0]);
     const amrex::Real ufac = m_deltaU * std::exp(0.5) / m_ref_height;
@@ -169,7 +150,7 @@ void ABLFieldInit::operator()(
     const amrex::Real* th = m_thht_d.data();
     const amrex::Real* tv = m_thvv_d.data();
 
-    if (m_profile_height) {
+    if (m_init_uvtheta_profile) {
 
         const amrex::Real* uu = m_prof_u_d.data();
         const amrex::Real* vv = m_prof_v_d.data();
@@ -194,6 +175,7 @@ void ABLFieldInit::operator()(
                         const amrex::Real slopeu =
                             (uu[iz + 1] - uu[iz]) / (th[iz + 1] - th[iz]);
                         umean_prof = uu[iz] + (z - th[iz]) * slopeu;
+
                         const amrex::Real slopev =
                             (vv[iz + 1] - vv[iz]) / (th[iz + 1] - th[iz]);
                         vmean_prof = vv[iz] + (z - th[iz]) * slopev;
@@ -201,23 +183,12 @@ void ABLFieldInit::operator()(
                 }
 
                 temperature(i, j, k, 0) += theta;
-                // Mean velocity field
                 velocity(i, j, k, 0) += umean_prof;
                 velocity(i, j, k, 1) += vmean_prof;
-
-                if (perturb_vel) {
-                    const amrex::Real xl = x - problo[0];
-                    const amrex::Real yl = y - problo[1];
-                    const amrex::Real zl = z / ref_height;
-                    const amrex::Real damp = std::exp(-0.5 * zl * zl);
-
-                    velocity(i, j, k, 0) +=
-                        ufac * damp * z * std::cos(aval * yl);
-                    velocity(i, j, k, 1) +=
-                        vfac * damp * z * std::cos(bval * xl);
-                }
             });
+
     } else {
+
         const amrex::Real umean = m_vel[0];
         const amrex::Real vmean = m_vel[1];
         const amrex::Real wmean = m_vel[2];
@@ -244,18 +215,22 @@ void ABLFieldInit::operator()(
                 }
 
                 temperature(i, j, k, 0) += theta;
+            });
+    }
 
-                if (perturb_vel) {
-                    const amrex::Real xl = x - problo[0];
-                    const amrex::Real yl = y - problo[1];
-                    const amrex::Real zl = z / ref_height;
-                    const amrex::Real damp = std::exp(-0.5 * zl * zl);
+    if (perturb_vel) {
+        amrex::ParallelFor(
+            vbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                const amrex::Real x = problo[0] + (i + 0.5) * dx[0];
+                const amrex::Real y = problo[1] + (j + 0.5) * dx[1];
+                const amrex::Real z = problo[2] + (k + 0.5) * dx[2];
+                const amrex::Real xl = x - problo[0];
+                const amrex::Real yl = y - problo[1];
+                const amrex::Real zl = z / ref_height;
+                const amrex::Real damp = std::exp(-0.5 * zl * zl);
 
-                    velocity(i, j, k, 0) +=
-                        ufac * damp * z * std::cos(aval * yl);
-                    velocity(i, j, k, 1) +=
-                        vfac * damp * z * std::cos(bval * xl);
-                }
+                velocity(i, j, k, 0) += ufac * damp * z * std::cos(aval * yl);
+                velocity(i, j, k, 1) += vfac * damp * z * std::cos(bval * xl);
             });
     }
 }
