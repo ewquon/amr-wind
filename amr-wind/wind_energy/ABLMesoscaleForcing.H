@@ -6,6 +6,8 @@
 #include "AMReX_Array.H"
 #include "AMReX_Vector.H"
 #include "amr-wind/CFDSim.H"
+#include "amr-wind/wind_energy/ABLMesoscaleInput.H"
+#include "amr-wind/wind_energy/ABL.H"
 
 namespace amr_wind {
 
@@ -16,6 +18,7 @@ public:
     ABLMesoscaleForcing(const CFDSim& sim, const std::string identifier);
 
     void indirectForcingInit();
+    void GP_forcingInit();
 
     static void invertMat(
         const amrex::Array2D<amrex::Real, 0, 3, 0, 3>& m,
@@ -24,14 +27,17 @@ public:
 protected:
     const SimTime& m_time;
     const amrex::AmrCore& m_mesh;
+    const ABLMesoscaleInput& m_meso_file;
+    const std::string m_identifier;
 
     int m_idx_time;
     int m_axis{2};
 
     // inputs
-    std::string m_forcing_scheme;
+    std::string m_forcing_scheme;  // direct | indirect | Gaussian_process
     amrex::Real m_gain_coeff{0.2}; // relaxation factor for all forcing schemes
     bool m_debug{false};           // print out profiles for debugging
+    bool debug() { return m_debug; }
 
     // planar averaging heights
     amrex::Vector<amrex::Real> m_zht;
@@ -106,9 +112,9 @@ protected:
     //   "noisy" obesrvations--i.e., forcing that we don't completely trust
     //   in specified regions
     //
-    bool m_update_var_mat = false; // update Sigma_11 at every time step
+    bool m_update_var_mat = true; // update Sigma_11 at every time step
     bool m_update_covar_mat = false; // update Sigma_12 at every time step
-    int m_update_freq = false; // how often to update (co)variance matrices
+    int m_update_freq = 1; // how often to update (co)variance matrices
     std::string m_covar_func = "RBF"; // covariance function (kernel)
     amrex::Real m_length_scale = 1.0; // to scale covariance function
     amrex::Real m_sigma_noise = 1.0; // standard deviation of the base error
@@ -121,16 +127,16 @@ protected:
     // - kernel of observations to predictions (Sigma12), row-major order; 
     //   should only be called once (unless the input data heights change
     //   over time
-    void updateSigma12(amrex::Vector<amrex::Real>& x1);
+    void GP_updateSigma12();
 
     // - kernel of noisy observations (Sigma11) matrix, in upper triangular
     //   form, row-major order; this needs to be updated if the specific error
     //   is time-varying
-    void updateSigma11Packed(amrex::Vector<amrex::Real>& x1);
+    void GP_updateSigma11Packed();
 
     // - calculate the Gaussian process posterior (mean only, we are currently
     //   not using the covariance in any way)
-    void GPPosteriorMean();
+    void GP_posteriorMean();
 
 };
 

@@ -11,6 +11,8 @@ namespace amr_wind {
 ABLMesoscaleForcing::ABLMesoscaleForcing(
     const CFDSim& sim, const std::string identifier)
     : m_time(sim.time()), m_mesh(sim.mesh())
+    , m_meso_file(sim.physics_manager().get<amr_wind::ABL>().abl_meso_file())
+    , m_identifier(identifier)
 {
     amrex::Print() << "Constructing " << identifier << " object" << std::endl;
 
@@ -98,10 +100,18 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
                            << std::endl;
         }
     } // if forcing scheme is "indirect"
-    else if (amrex::toLower(m_forcing_scheme) == "gaussianprocess") {
+
+    else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
         pp.query("update_var_mat", m_update_var_mat);
         pp.query("update_covar_mat", m_update_var_mat);
         pp.query("update_freq", m_update_freq);
+        if (m_update_var_mat || m_update_covar_mat) {
+            amrex::Print() << "  update";
+            if (m_update_var_mat) amrex::Print() << " Sigma_11";
+            if (m_update_covar_mat) amrex::Print() << " Sigma_12";
+            amrex::Print() << " every " << m_update_freq << " steps"
+                << std::endl;
+        }
         pp.query("covariance_function", m_covar_func);
         if (amrex::toLower(m_covar_func) != "rbf") {
             amrex::Print() << "  ignoring specified covariance function "
@@ -115,6 +125,12 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
             (amrex::toLower(m_spec_err_type) != "forcing_variance")) {
             amrex::Abort("Unrecognized specified_error type");
         }
+    }
+
+    else if (amrex::toLower(m_forcing_scheme) != "direct") {
+        // TOOD: make forcing schemes based on factory approach
+        amrex::Print() << "Valid forcing_scheme options: direct indirect Gaussian_process" << std::endl;
+        amrex::Abort("Unrecognized forcing_scheme");
     }
 }
 
@@ -143,6 +159,7 @@ void ABLMesoscaleForcing::updateWeights()
     }
 }
 
+// TODO: generalize the initialization
 void ABLMesoscaleForcing::indirectForcingInit()
 {
     if (m_W.empty()) {
@@ -184,6 +201,12 @@ void ABLMesoscaleForcing::indirectForcingInit()
     }
     // Invert the matrix Z^T W Z
     invertMat(zTz, m_im_zTz);
+}
+
+void ABLMesoscaleForcing::GP_forcingInit()
+{
+    GP_updateSigma11Packed();
+    GP_updateSigma12();
 }
 
 void ABLMesoscaleForcing::invertMat(
@@ -305,16 +328,18 @@ void ABLMesoscaleForcing::blendForcings(
 // TODO: covariance function is hard-coded for now; can generalize the
 // following updateSigma* functions
 
-void updateSigma11(amrex::Vector<amrex::Real>& x1)
+void ABLMesoscaleForcing::GP_updateSigma11Packed()
 {
-    // X1: ncfile.meso_heights() 
-    // X2: m_zht
+    const amrex::Vector<amrex::Real>& x1 = m_meso_file.meso_heights();
+    const amrex::Vector<amrex::Real>& x2 = m_zht;
+    amrex::Print() << "[GPIPA] Updating Sigma_11 for " << m_identifier << std::endl;
 }
 
-void updateSigma12(amrex::Vector<amrex::Real>& x1)
+void ABLMesoscaleForcing::GP_updateSigma12()
 {
-    // X1: ncfile.meso_heights() 
-    // X2: m_zht
+    const amrex::Vector<amrex::Real>& x1 = m_meso_file.meso_heights();
+    const amrex::Vector<amrex::Real>& x2 = m_zht;
+    amrex::Print() << "[GPIPA] Updating Sigma_12 for " << m_identifier << std::endl;
 }
 
 } // namespace amr_wind

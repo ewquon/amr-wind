@@ -41,9 +41,12 @@ ABLMesoForcingMom::ABLMesoForcingMom(const CFDSim& sim)
         mean_velocity_init(abl.abl_meso_file());
     }
 
+    // TODO: generalize the initialization
     if ((amrex::toLower(m_forcing_scheme) == "indirect") &&
         !m_update_transition_height) {
         indirectForcingInit(); // do this once
+    } else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+        GP_forcingInit();
     }
 }
 
@@ -114,6 +117,8 @@ void ABLMesoForcingMom::mean_velocity_heights(
 {
     if (m_forcing_scheme.empty()) {
         return;
+    } else if (m_debug) {
+        amrex::Print() << "Momentum forcing with tendencies" << std::endl;
     }
 
     amrex::Real currtime;
@@ -166,6 +171,9 @@ void ABLMesoForcingMom::mean_velocity_heights(
 {
     if (m_forcing_scheme.empty()) {
         return;
+    } else if (m_debug) {
+        amrex::Print() << "Momentum forcing with profile assimilation"
+            << std::endl;
     }
 
     amrex::Real currtime;
@@ -331,6 +339,15 @@ void ABLMesoForcingMom::mean_velocity_heights(
                 amrex::Print() << m_zht[ih] << " " << error_U[ih] << " "
                                << error_V[ih] << std::endl;
             }
+        }
+    }
+
+    if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+        if (m_update_var_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSigma11Packed();
+        }
+        if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSigma12();
         }
     }
 

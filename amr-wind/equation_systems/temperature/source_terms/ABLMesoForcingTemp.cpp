@@ -41,9 +41,12 @@ ABLMesoForcingTemp::ABLMesoForcingTemp(const CFDSim& sim)
         mean_temperature_init(abl.abl_meso_file());
     }
 
+    // TODO: generalize the initialization
     if ((amrex::toLower(m_forcing_scheme) == "indirect") &&
         !m_update_transition_height) {
         indirectForcingInit(); // do this once
+    } else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+        GP_forcingInit();
     }
 }
 
@@ -102,6 +105,10 @@ void ABLMesoForcingTemp::mean_temperature_init(
 amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
     std::unique_ptr<ABLMesoscaleInput>& ncfile)
 {
+    if (!m_forcing_scheme.empty() && m_debug) {
+        amrex::Print() << "Temperature forcing with tendencies"
+            << std::endl;
+    }
 
     amrex::Real currtime;
     currtime = m_time.current_time();
@@ -154,6 +161,10 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
     const FieldPlaneAveragingFine& tavg,
     std::unique_ptr<ABLMesoscaleInput>& ncfile)
 {
+    if (!m_forcing_scheme.empty() && m_debug) {
+        amrex::Print() << "Temperature forcing with profile assimilation"
+            << std::endl;
+    }
 
     amrex::Real currtime;
     currtime = m_time.current_time();
@@ -288,6 +299,15 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
             for (size_t ih = 0; ih < n_levels; ih++) {
                 amrex::Print() << m_zht[ih] << " " << error_T[ih] << std::endl;
             }
+        }
+    }
+
+    if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+        if (m_update_var_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSigma11Packed();
+        }
+        if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSigma12();
         }
     }
 
