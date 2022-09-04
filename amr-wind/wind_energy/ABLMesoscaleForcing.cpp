@@ -102,6 +102,7 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
     } // if forcing scheme is "indirect"
 
     else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+#ifdef AMR_WIND_USE_LAPACK
         pp.query("update_var_mat", m_update_var_mat);
         pp.query("update_covar_mat", m_update_var_mat);
         pp.query("update_freq", m_update_freq);
@@ -125,6 +126,10 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
             (amrex::toLower(m_spec_err_type) != "forcing_variance")) {
             amrex::Abort("Unrecognized specified_error type");
         }
+#else
+        amrex::Abort(
+            "LAPACK support needed for Gaussian-process profile assimilation.");
+#endif
     }
 
     else if (amrex::toLower(m_forcing_scheme) != "direct") {

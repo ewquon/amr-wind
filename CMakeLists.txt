@@ -41,6 +41,7 @@ option(AMR_WIND_ENABLE_MASA "Enable MASA library" OFF)
 option(AMR_WIND_ENABLE_HYPRE "Enable HYPRE integration" OFF)
 option(AMR_WIND_ENABLE_OPENFAST "Enable OpenFAST integration" OFF)
 option(AMR_WIND_ENABLE_ASCENT "Enable Ascent visualization library" OFF)
+option(AMR_WIND_ENABLE_LAPACK "Enable Linear Algebra PACKage" OFF)
 
 #Options for C++
 set(CMAKE_CXX_STANDARD 14)
@@ -164,6 +165,14 @@ if(AMR_WIND_ENABLE_ASCENT)
     target_link_libraries(${amr_wind_lib_name} PUBLIC ascent::ascent)
   endif()
   target_compile_definitions(${amr_wind_lib_name} PRIVATE AMR_WIND_USE_ASCENT)
+endif()
+
+if(AMR_WIND_ENABLE_LAPACK)
+  find_package(BLAS)
+  find_package(LAPACK)
+  set(lapack_blas_libraries ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+  target_link_libraries(${amr_wind_lib_name} PUBLIC ${lapack_blas_libraries})
+  target_compile_definitions(${amr_wind_lib_name} PUBLIC AMR_WIND_USE_LAPACK)
 endif()
 
 #Build amr-wind and link to amrex library
