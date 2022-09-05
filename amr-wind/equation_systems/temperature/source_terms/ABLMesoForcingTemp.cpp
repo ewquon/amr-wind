@@ -309,6 +309,16 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
         if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
             GP_updateSigma12();
         }
+
+        amrex::Vector<amrex::Real> error_T_direct(error_T);
+        error_T = GP_posteriorMean(error_T);
+
+        if (m_debug) {
+            for (size_t ih = 0; ih < n_levels; ih++) {
+                amrex::Print() << m_zht[ih] << " " << error_T_direct[ih] << " "
+                               << error_T[ih] << std::endl;
+            }
+        }
     }
 
     amrex::Gpu::copy(

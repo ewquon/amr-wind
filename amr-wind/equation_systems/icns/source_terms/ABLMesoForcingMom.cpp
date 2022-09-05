@@ -349,6 +349,19 @@ void ABLMesoForcingMom::mean_velocity_heights(
         if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
             GP_updateSigma12();
         }
+
+        amrex::Vector<amrex::Real> error_U_direct(error_U);
+        amrex::Vector<amrex::Real> error_V_direct(error_V);
+        error_U = GP_posteriorMean(error_U_direct);
+        error_V = GP_posteriorMean(error_V_direct);
+
+        if (m_debug) {
+            for (size_t ih = 0; ih < n_levels; ih++) {
+                amrex::Print() << m_zht[ih] << " " << error_U_direct[ih] << " "
+                               << error_U[ih] << " " << error_V_direct[ih]
+                               << " " << error_V[ih] << std::endl;
+            }
+        }
     }
 
     amrex::Gpu::copy(

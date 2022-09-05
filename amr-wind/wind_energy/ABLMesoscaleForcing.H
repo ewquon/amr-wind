@@ -147,7 +147,8 @@ protected:
 
     // - calculate the Gaussian process posterior (mean only, we are currently
     //   not using the covariance in any way)
-    void GP_posteriorMean();
+    amrex::Vector<amrex::Real> GP_posteriorMean(
+        const amrex::Vector<amrex::Real> y1);
 
 };
 

@@ -390,5 +390,26 @@ void ABLMesoscaleForcing::GP_updateSigma12()
     }
 }
 
+amrex::Vector<amrex::Real> ABLMesoscaleForcing::GP_posteriorMean(
+    amrex::Vector<amrex::Real> y1)
+{
+    const int n1 = m_meso_file.nheights();
+    // TODO: get y1 at meso_heights() if x1 and x2 are different
+    // TODO: calculate y2 in place if x1 and x2 are the same
+    amrex::Vector<amrex::Real> y2(y1);
+
+    // do regression 
+    int info;
+    const char uplo = 'U';
+    std::vector<double> reg(Sigma12);
+    dpptrs_(&uplo, &n1, &m_nht, &Sigma11[0], &reg[0], &n1, &info);
+    if (info != 0) {
+        amrex::Print() << "[GPIPA] WARNING: SPD solve returned " << info
+            << std::endl;
+    }
+
+    return y2;
+}
+
 } // namespace amr_wind
 
