@@ -347,21 +347,29 @@ void ABLMesoscaleForcing::GP_updateSigma11Packed()
     const int n1 = m_meso_file.nheights();
     amrex::Print() << "[GPIPA] Updating Sigma_11 for " << m_identifier
         << std::endl;
-    /* Hard-coded covariance function for now
-       from https://netlib.org/lapack/double/dpptrf.f
-         if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
-    */
     Sigma11.resize(n1*(n1+1)/2);
     int lin_idx = 0;
+    double base_err = m_sigma_noise * m_sigma_noise;
+    // From https://netlib.org/lapack/double/dpptrf.f
+    //   if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
     for (int j=0; j < n1; j++) {
         for (int i=0; i < j+1; i++) {
-            if (i==j) {
-                Sigma11[lin_idx] = 0.0;
-            } else {
-                Sigma11[lin_idx] = GP_covar_func(x1[i], x1[j]);
-            }
+            Sigma11[lin_idx] = GP_covar_func(x1[i], x1[j]);
+            if (i==j) Sigma11[lin_idx] += base_err;
             lin_idx++;
         }
+    }
+
+    // Add specific error
+
+    // Compute Cholesky factorization
+    //int info = LAPACKE_dpptrf(LAPACK_COL_MAJOR, 'U', n1, &Sigma11[0]);
+    int info;
+    const char uplo = 'U';
+    dpptrf_(&uplo, &n1, &Sigma11[0], &info);
+    if (info != 0) {
+        amrex::Print() << "[GPIPA] WARNING: Cholesky factorization returned "
+            << info << std::endl;
     }
 }
 
@@ -371,12 +379,10 @@ void ABLMesoscaleForcing::GP_updateSigma12()
     const int n1 = m_meso_file.nheights();
     amrex::Print() << "[GPIPA] Updating Sigma_12 for " << m_identifier
         << std::endl;
-    /* Hard-coded covariance function for now
-       from https://netlib.org/lapack/double/dpptrf.f
-         if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
-    */
     Sigma12.resize(n1*m_nht);
     int lin_idx = 0;
+    // From https://netlib.org/lapack/double/dpptrf.f
+    //   if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
     for (int j=0; j < m_nht; j++) {
         for (int i=0; i < n1; i++) {
             Sigma12[lin_idx++] = GP_covar_func(x1[i], m_zht[j]);
