@@ -115,7 +115,7 @@ protected:
     bool m_update_var_mat = true; // update Sigma_11 at every time step
     bool m_update_covar_mat = false; // update Sigma_12 at every time step
     int m_update_freq = 1; // how often to update (co)variance matrices
-    std::string m_covar_func = "RBF"; // covariance function (kernel)
+    std::string m_covar_func = "sq_exp"; // covariance function (kernel)
     amrex::Real m_length_scale = 1.0; // to scale covariance function
     amrex::Real m_sigma_noise = 1.0; // standard deviation of the base error
     std::string m_spec_err_type = "none"; // or "forcing_variance"
@@ -125,7 +125,8 @@ protected:
     std::vector<double> Sigma12; // full RHS matrix
 
     // - covariance functions
-    inline double GP_RBF(double z_i, double z_j) {
+    // hard-coded for now: squared exponential
+    inline double GP_covar_func(double z_i, double z_j) {
         double d = (z_i - z_j) / m_length_scale;
         return std::exp(-0.5*d*d);
     }

@@ -114,9 +114,10 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
                 << std::endl;
         }
         pp.query("covariance_function", m_covar_func);
-        if (amrex::toLower(m_covar_func) != "rbf") {
+        if (amrex::toLower(m_covar_func) != "sq_exp") {
             amrex::Print() << "  ignoring specified covariance function "
-                << m_covar_func << ", only RBF kernel is implemented"
+                << m_covar_func
+                << ", only squared-exponential kernel is implemented"
                 << std::endl;
         }
         pp.query("length_scale", m_length_scale);
@@ -129,6 +130,10 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
             (amrex::toLower(m_spec_err_type) != "forcing_variance")) {
             amrex::Abort("Unrecognized specified_error type");
         }
+        amrex::Print() << "  covariance func : " << m_covar_func << std::endl;
+        amrex::Print() << "  length scale    : " << m_length_scale << std::endl;
+        amrex::Print() << "  base error      : " << m_sigma_noise << std::endl;
+        amrex::Print() << "  specified error : " << m_spec_err_type << std::endl;
 #else
         amrex::Abort(
             "LAPACK support needed for Gaussian-process profile assimilation.");
@@ -340,7 +345,8 @@ void ABLMesoscaleForcing::GP_updateSigma11Packed()
 {
     const amrex::Vector<amrex::Real>& x1 = m_meso_file.meso_heights();
     const int n1 = m_meso_file.nheights();
-    amrex::Print() << "[GPIPA] Updating Sigma_11 for " << m_identifier << std::endl;
+    amrex::Print() << "[GPIPA] Updating Sigma_11 for " << m_identifier
+        << std::endl;
     /* Hard-coded covariance function for now
        from https://netlib.org/lapack/double/dpptrf.f
          if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
@@ -352,7 +358,7 @@ void ABLMesoscaleForcing::GP_updateSigma11Packed()
             if (i==j) {
                 Sigma11[lin_idx] = 0.0;
             } else {
-                Sigma11[lin_idx] = GP_RBF(x1[i], x1[j]);
+                Sigma11[lin_idx] = GP_covar_func(x1[i], x1[j]);
             }
             lin_idx++;
         }
@@ -363,7 +369,8 @@ void ABLMesoscaleForcing::GP_updateSigma12()
 {
     const amrex::Vector<amrex::Real>& x1 = m_meso_file.meso_heights();
     const int n1 = m_meso_file.nheights();
-    amrex::Print() << "[GPIPA] Updating Sigma_12 for " << m_identifier << std::endl;
+    amrex::Print() << "[GPIPA] Updating Sigma_12 for " << m_identifier
+        << std::endl;
     /* Hard-coded covariance function for now
        from https://netlib.org/lapack/double/dpptrf.f
          if UPLO = 'U', AP(i + (j-1)*j/2) = A(i,j) for 1<=i<=j
@@ -372,7 +379,7 @@ void ABLMesoscaleForcing::GP_updateSigma12()
     int lin_idx = 0;
     for (int j=0; j < m_nht; j++) {
         for (int i=0; i < n1; i++) {
-            Sigma12[lin_idx++] = GP_RBF(x1[i], m_zht[j]);
+            Sigma12[lin_idx++] = GP_covar_func(x1[i], m_zht[j]);
         }
     }
 }
