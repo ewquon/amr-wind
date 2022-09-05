@@ -121,8 +121,14 @@ protected:
     std::string m_spec_err_type = "none"; // or "forcing_variance"
 
     // lapack input/output data
-    double* Sigma11; // packed LHS matrix
-    double* Sigma12; // full RHS matrix
+    std::vector<double> Sigma11; // packed LHS matrix
+    std::vector<double> Sigma12; // full RHS matrix
+
+    // - covariance functions
+    inline double GP_RBF(double z_i, double z_j) {
+        double d = (z_i - z_j) / m_length_scale;
+        return std::exp(-0.5*d*d);
+    }
 
     // - kernel of observations to predictions (Sigma12), row-major order; 
     //   should only be called once (unless the input data heights change
