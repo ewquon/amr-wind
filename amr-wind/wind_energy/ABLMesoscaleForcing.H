@@ -9,9 +9,16 @@
 #include "amr-wind/wind_energy/ABLMesoscaleInput.H"
 #include "amr-wind/wind_energy/ABL.H"
 
-extern "C" void dpptrf_(const char *uplo, const int *n, double *AP, int *info);
-extern "C" void dpptrs_(const char *uplo, const int *n, const int *nrhs,
-                        double *AP, double *B, const int *ldb, int *info);
+extern "C" {
+    void dpptrf_(const char *uplo, const int *n, double *AP, int *info);
+    void dpptrs_(
+        const char *uplo, const int *n, const int *nrhs, double *AP, double *B,
+        const int *ldb, int *info);
+    void dgemv_(const char* trans, const int* m, const int* n, double* alpha,
+        double* A, const int* lda, double* X, const int* incx, double* beta,
+        double* Y, const int* incy);
+}
+
 
 namespace amr_wind {
 

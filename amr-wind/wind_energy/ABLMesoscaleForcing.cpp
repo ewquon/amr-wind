@@ -393,20 +393,18 @@ void ABLMesoscaleForcing::GP_updateSigma12()
 amrex::Vector<amrex::Real> ABLMesoscaleForcing::GP_posteriorMean(
     amrex::Vector<amrex::Real> y1)
 {
-    const int n1 = m_meso_file.nheights();
     // TODO: get y1 at meso_heights() if x1 and x2 are different
-    // TODO: calculate y2 in place if x1 and x2 are the same
-    amrex::Vector<amrex::Real> y2(m_nht);
+    const int n1 = m_meso_file.nheights();
 
     // get mean of input y
-    amrex::Real ymean = 0;
+    double ymean = 0;
     for (int i=0; i < y1.size(); i++) {
         ymean += y1[i];
     }
     ymean /= y1.size();
 
     // center input values around 0, get max abs
-    amrex::Real ynorm = 0;
+    double ynorm = 0;
     for (int i=0; i < y1.size(); i++) {
         y1[i] -= ymean;
         if (std::abs(y1[i]) > ynorm) {
@@ -429,10 +427,19 @@ amrex::Vector<amrex::Real> ABLMesoscaleForcing::GP_posteriorMean(
             << std::endl;
     }
 
-    // rescale values
-    for (int i=0; i < y1.size(); i++) {
-        y2[i] = (y1[i] * ynorm) + ymean;
-    }
+    // evaluate, rescale, and shift values
+    // TODO: calculate y2 in place if x1 and x2 are the same
+    amrex::Vector<amrex::Real> y2(m_nht, 1.0);
+    const char trans = 'T';
+    const int incx = 1;
+    const int incy = 1;
+    // calculate y := alpha*A**T*x + beta*y, where
+    //   A == reg
+    //   x == y1
+    //   alpha == ynorm
+    //   beta == ymean
+    dgemv_(&trans, &n1, &m_nht, &ynorm, &reg[0], &n1, &y1[0], &incx, &ymean,
+        &y2[0], &incy);
 
     return y2;
 }
