@@ -396,7 +396,28 @@ amrex::Vector<amrex::Real> ABLMesoscaleForcing::GP_posteriorMean(
     const int n1 = m_meso_file.nheights();
     // TODO: get y1 at meso_heights() if x1 and x2 are different
     // TODO: calculate y2 in place if x1 and x2 are the same
-    amrex::Vector<amrex::Real> y2(y1);
+    amrex::Vector<amrex::Real> y2(m_nht);
+
+    // get mean of input y
+    amrex::Real ymean = 0;
+    for (int i=0; i < y1.size(); i++) {
+        ymean += y1[i];
+    }
+    ymean /= y1.size();
+
+    // center input values around 0, get max abs
+    amrex::Real ynorm = 0;
+    for (int i=0; i < y1.size(); i++) {
+        y1[i] -= ymean;
+        if (std::abs(y1[i]) > ynorm) {
+            ynorm = std::abs(y1[i]);
+        }
+    }
+
+    // normalize values
+    for (int i=0; i < y1.size(); i++) {
+        y1[i] /= ynorm;
+    }
 
     // do regression 
     int info;
@@ -406,6 +427,11 @@ amrex::Vector<amrex::Real> ABLMesoscaleForcing::GP_posteriorMean(
     if (info != 0) {
         amrex::Print() << "[GPIPA] WARNING: SPD solve returned " << info
             << std::endl;
+    }
+
+    // rescale values
+    for (int i=0; i < y1.size(); i++) {
+        y2[i] = (y1[i] * ynorm) + ymean;
     }
 
     return y2;
