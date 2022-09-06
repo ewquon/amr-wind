@@ -219,6 +219,7 @@ void ABLMesoscaleForcing::indirectForcingInit()
 
 void ABLMesoscaleForcing::GP_forcingInit()
 {
+    GP_updateSpecifiedError();
     GP_updateSigma11Packed();
     GP_updateSigma12();
 }
