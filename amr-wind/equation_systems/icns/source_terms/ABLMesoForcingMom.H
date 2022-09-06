@@ -79,6 +79,9 @@ private:
     // assumed)
     amrex::Array<amrex::Real, 4> m_poly_coeff_U;
     amrex::Array<amrex::Real, 4> m_poly_coeff_V;
+
+    // override to modify m_spec_err based on U and V forcings
+    void GP_updateSpecifiedError();
 };
 
 } // namespace icns

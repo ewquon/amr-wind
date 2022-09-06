@@ -102,7 +102,6 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
     } // if forcing scheme is "indirect"
 
     else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
-        m_spec_err = amrex::Vector<amrex::Real>(m_meso_file.nheights(), 0.0);
 #ifdef AMR_WIND_USE_LAPACK
         pp.query("update_var_mat", m_update_var_mat);
         pp.query("update_covar_mat", m_update_var_mat);

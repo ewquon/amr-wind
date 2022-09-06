@@ -304,6 +304,7 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
 
     if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
         if (m_update_var_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSpecifiedError();
             GP_updateSigma11Packed();
         }
         if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
@@ -330,6 +331,9 @@ amrex::Real ABLMesoForcingTemp::mean_temperature_heights(
     }
 
     return interpTflux;
+}
+
+void ABLMesoForcingTemp::GP_updateSpecifiedError() {
 }
 
 void ABLMesoForcingTemp::operator()(

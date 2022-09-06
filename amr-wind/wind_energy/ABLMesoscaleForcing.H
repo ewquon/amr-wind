@@ -155,6 +155,11 @@ protected:
     //   is time-varying
     void GP_updateSigma11Packed();
 
+    // - update specific error, called prior to GP_udpateSigma11Packed()
+    virtual void GP_updateSpecifiedError() {
+        m_spec_err = amrex::Vector<amrex::Real>(m_meso_file.nheights(), 0.0);
+    }
+
     // - calculate the Gaussian process posterior (mean only, we are currently
     //   not using the covariance in any way)
     amrex::Vector<amrex::Real> GP_posteriorMean(

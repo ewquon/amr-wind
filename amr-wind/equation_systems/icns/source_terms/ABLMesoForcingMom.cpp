@@ -344,6 +344,7 @@ void ABLMesoForcingMom::mean_velocity_heights(
 
     if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
         if (m_update_var_mat && (m_time.time_index() % m_update_freq == 0)) {
+            GP_updateSpecifiedError();
             GP_updateSigma11Packed();
         }
         if (m_update_covar_mat && (m_time.time_index() % m_update_freq == 0)) {
@@ -376,6 +377,9 @@ void ABLMesoForcingMom::mean_velocity_heights(
         m_err_U[ih] = error_U[ih] * m_gain_coeff;
         m_err_V[ih] = error_V[ih] * m_gain_coeff;
     }
+}
+
+void ABLMesoForcingMom::GP_updateSpecifiedError() {
 }
 
 void ABLMesoForcingMom::operator()(

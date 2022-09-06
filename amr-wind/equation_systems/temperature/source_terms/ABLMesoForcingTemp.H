@@ -63,6 +63,9 @@ private:
 
     // this should be m_ind_polyOrder+1 (currently, cubic polynomial is assumed)
     amrex::Array<amrex::Real, 4> m_poly_coeff_theta;
+
+    // override to modify m_spec_err based on theta forcing
+    void GP_updateSpecifiedError();
 };
 
 } // namespace temperature
