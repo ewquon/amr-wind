@@ -135,6 +135,9 @@ protected:
     std::vector<double> Sigma11; // packed LHS matrix
     std::vector<double> Sigma12; // full RHS matrix
 
+    // specified error vector
+    amrex::Vector<amrex::Real> m_spec_err; // of size n1
+
     // - covariance functions
     // hard-coded for now: squared exponential
     inline double GP_covar_func(double z_i, double z_j) {

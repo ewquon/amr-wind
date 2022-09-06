@@ -102,6 +102,7 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
     } // if forcing scheme is "indirect"
 
     else if (amrex::toLower(m_forcing_scheme) == "gaussian_process") {
+        m_spec_err = amrex::Vector<amrex::Real>(m_meso_file.nheights(), 0.0);
 #ifdef AMR_WIND_USE_LAPACK
         pp.query("update_var_mat", m_update_var_mat);
         pp.query("update_covar_mat", m_update_var_mat);
@@ -130,6 +131,7 @@ ABLMesoscaleForcing::ABLMesoscaleForcing(
             (amrex::toLower(m_spec_err_type) != "forcing_variance")) {
             amrex::Abort("Unrecognized specified_error type");
         }
+
         amrex::Print() << "  covariance func : " << m_covar_func << std::endl;
         amrex::Print() << "  length scale    : " << m_length_scale << std::endl;
         amrex::Print() << "  base error      : " << m_sigma_noise << std::endl;
@@ -355,7 +357,9 @@ void ABLMesoscaleForcing::GP_updateSigma11Packed()
     for (int j=0; j < n1; j++) {
         for (int i=0; i < j+1; i++) {
             Sigma11[lin_idx] = GP_covar_func(x1[i], x1[j]);
-            if (i==j) Sigma11[lin_idx] += base_err;
+            if (i==j) {
+                Sigma11[lin_idx] += base_err + m_spec_err[i];
+            }
             lin_idx++;
         }
     }
