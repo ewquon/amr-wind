@@ -7,7 +7,7 @@ namespace amr_wind_tests {
 
 namespace {
 
-amrex::Real init_vof(amr_wind::Field& vof_fld, amrex::Real water_level)
+void init_vof(amr_wind::Field& vof_fld, amrex::Real water_level)
 {
     const auto& mesh = vof_fld.repo().mesh();
     const int nlevels = vof_fld.repo().num_active_levels();
@@ -16,8 +16,6 @@ amrex::Real init_vof(amr_wind::Field& vof_fld, amrex::Real water_level)
     amrex::Real offset = 0.5;
     // VOF has only one component
     int d = 0;
-    // Linearly interpolated water level
-    amrex::Real liwl_max = -100.0;
 
     for (int lev = 0; lev < nlevels; ++lev) {
         const auto& dx = mesh.Geom(lev).CellSizeArray();
@@ -37,58 +35,23 @@ amrex::Real init_vof(amr_wind::Field& vof_fld, amrex::Real water_level)
                 farr(i, j, k, d) = local_vof;
             });
         }
-        // Use ReduceMax to get linearly interpolated water level
-        amrex::Real liwl_lev = -100.0;
-        liwl_lev = amrex::ReduceMax(
-            vof_fld(lev), 0.,
-            [=] AMREX_GPU_HOST_DEVICE(
-                amrex::Box const& b,
-                amrex::Array4<amrex::Real const> const& field_arr)
-                -> amrex::Real {
-                amrex::Real liwl = -100.0;
-                amrex::Loop(b, [=, &liwl](int i, int j, int k) noexcept {
-                    const amrex::Real z = problo[2] + (k + offset) * dx[2];
-                    auto local_vof = field_arr(i, j, k, 0);
-                    if (local_vof > 0 && local_vof < 1) {
-                        liwl =
-                            z + (0.5 - local_vof) / (0.0 - local_vof) * dx[2];
-                    }
-                });
-                return liwl;
-            });
-        liwl_max = amrex::max(liwl_max, liwl_lev);
     }
-    amrex::ParallelDescriptor::ReduceRealMax(liwl_max);
-    // If only single-phase cells, no interpolation needed
-    if (liwl_max < 0) {
-        liwl_max = water_level;
-    }
-    // Return result
-    return liwl_max;
 }
 
 void init_vof_multival(
-    amr_wind::Field& vof_fld,
-    amrex::Real& wl2,
-    amrex::Real& wl1,
-    amrex::Real& wl0)
+    amr_wind::Field& vof_fld, amrex::Real wl2, amrex::Real wl1, amrex::Real wl0)
 {
     const auto& mesh = vof_fld.repo().mesh();
     const int nlevels = vof_fld.repo().num_active_levels();
 
     // This function initializes a vof field divided by a liquid-gas interface
     // at wl0, above which is another layer of liquid, introducing interfaces
-    // at wl1 and wl2. The water level parameters (wl) are modified to the
-    // linearly-interpolated values as well.
+    // at wl1 and wl2.
 
     // Since VOF is cell centered
     amrex::Real offset = 0.5;
     // VOF has only one component
     int d = 0;
-    // Linearly interpolated water level
-    amrex::Real wl2_max = -100.0;
-    amrex::Real wl1_max = -100.0;
-    amrex::Real wl0_max = -100.0;
 
     for (int lev = 0; lev < nlevels; ++lev) {
         const auto& dx = mesh.Geom(lev).CellSizeArray();
@@ -124,115 +87,7 @@ void init_vof_multival(
                 farr(i, j, k, d) = local_vof;
             });
         }
-        // Use ReduceMax to get linearly interpolated water level: wl2
-        amrex::Real liwl_lev = amrex::ReduceMax(
-            vof_fld(lev), 0.,
-            [=] AMREX_GPU_HOST_DEVICE(
-                amrex::Box const& b,
-                amrex::Array4<amrex::Real const> const& field_arr)
-                -> amrex::Real {
-                amrex::Real liwl = -100.0;
-                amrex::Loop(b, [=, &liwl](int i, int j, int k) noexcept {
-                    const amrex::Real z = problo[2] + (k + offset) * dx[2];
-                    auto local_vof = field_arr(i, j, k, d);
-                    if (local_vof > 0 && local_vof < 1) {
-                        // Multiphase cell
-                        if (local_vof > 0.5) {
-                            // Cell at k + 1 is vof = 0
-                            liwl = z + (0.5 - local_vof) / (0.0 - local_vof) *
-                                           dx[2];
-                        } else {
-                            // Cell at k - 1 is vof = 1
-                            liwl = z - (0.5 - local_vof) / (1.0 - local_vof) *
-                                           dx[2];
-                        }
-                    } else {
-                        if (local_vof == 1 && field_arr(i, j, k + 1, d) == 0) {
-                            // Single-phase cells, liquid to gas
-                            liwl = z + 0.5 * dx[2];
-                        }
-                    }
-                });
-                return liwl;
-            });
-        wl2_max = amrex::max(wl2_max, liwl_lev);
-        // Use ReduceMax to get linearly interpolated water level: wl1
-        liwl_lev = amrex::ReduceMax(
-            vof_fld(lev), 0.,
-            [=] AMREX_GPU_HOST_DEVICE(
-                amrex::Box const& b,
-                amrex::Array4<amrex::Real const> const& field_arr)
-                -> amrex::Real {
-                amrex::Real liwl = -100.0;
-                amrex::Loop(b, [=, &liwl](int i, int j, int k) noexcept {
-                    const amrex::Real z = problo[2] + (k + offset) * dx[2];
-                    auto local_vof = field_arr(i, j, k, d);
-                    if (z < wl2) {
-                        if (local_vof > 0 && local_vof < 1) {
-                            // Multiphase cell, use interp rules of FreeSurface
-                            if (local_vof < 0.5) {
-                                // Cell at k + 1 is vof = 1
-                                liwl = z + (0.5 - local_vof) /
-                                               (1.0 - local_vof) * dx[2];
-                            } else {
-                                // Cell at k - 1 is vof = 0
-                                liwl = z - (0.5 - local_vof) /
-                                               (0.0 - local_vof) * dx[2];
-                            }
-                        } else {
-                            if (local_vof == 0 &&
-                                field_arr(i, j, k + 1, d) == 1) {
-                                // Single-phase cells, gas to liquid
-                                liwl = z + 0.5 * dx[2];
-                            }
-                        }
-                    }
-                });
-                return liwl;
-            });
-        wl1_max = amrex::max(wl1_max, liwl_lev);
-        // Use ReduceMax to get linearly interpolated water level: wl0
-        liwl_lev = amrex::ReduceMax(
-            vof_fld(lev), 0.,
-            [=] AMREX_GPU_HOST_DEVICE(
-                amrex::Box const& b,
-                amrex::Array4<amrex::Real const> const& field_arr)
-                -> amrex::Real {
-                amrex::Real liwl = -100.0;
-                amrex::Loop(b, [=, &liwl](int i, int j, int k) noexcept {
-                    const amrex::Real z = problo[2] + (k + offset) * dx[2];
-                    auto local_vof = field_arr(i, j, k, d);
-                    if (z < wl1) {
-                        if (local_vof > 0 && local_vof < 1) {
-                            // Multiphase cell
-                            if (local_vof > 0.5) {
-                                // Cell at k + 1 is vof = 0
-                                liwl = z + (0.5 - local_vof) /
-                                               (0.0 - local_vof) * dx[2];
-                            } else {
-                                // Cell at k - 1 is vof = 1
-                                liwl = z - (0.5 - local_vof) /
-                                               (1.0 - local_vof) * dx[2];
-                            }
-                        } else {
-                            if (local_vof == 1 &&
-                                field_arr(i, j, k + 1, d) == 0) {
-                                // Single-phase cells, gas to liquid
-                                liwl = z + 0.5 * dx[2];
-                            }
-                        }
-                    }
-                });
-                return liwl;
-            });
-        wl0_max = amrex::max(wl0_max, liwl_lev);
     }
-    wl2 = wl2_max;
-    wl1 = wl1_max;
-    wl0 = wl0_max;
-    amrex::ParallelDescriptor::ReduceRealMax(wl2);
-    amrex::ParallelDescriptor::ReduceRealMax(wl1);
-    amrex::ParallelDescriptor::ReduceRealMax(wl0);
 }
 
 void init_vof_slope(
@@ -453,7 +308,7 @@ TEST_F(FreeSurfaceTest, point)
     auto& vof = repo.declare_field("vof", 1, 2);
     setup_grid0D(1);
 
-    amrex::Real liwl = init_vof(vof, water_level0);
+    init_vof(vof, water_level0);
     auto& m_sim = sim();
     FreeSurfaceImpl tool(m_sim, "freesurface");
     tool.initialize();
@@ -468,7 +323,7 @@ TEST_F(FreeSurfaceTest, point)
     npos = tool.check_pos(1, "=", pt_coord[1]);
     ASSERT_EQ(npos, 1);
     // Check output value
-    int nout = tool.check_output("~", liwl);
+    int nout = tool.check_output("~", water_level0);
     ASSERT_EQ(nout, 1);
 }
 
@@ -479,7 +334,7 @@ TEST_F(FreeSurfaceTest, plane)
     auto& vof = repo.declare_field("vof", 1, 2);
     setup_grid2D(1);
 
-    amrex::Real liwl = init_vof(vof, water_level1);
+    init_vof(vof, water_level1);
     auto& m_sim = sim();
     FreeSurfaceImpl tool(m_sim, "freesurface");
     tool.initialize();
@@ -489,7 +344,7 @@ TEST_F(FreeSurfaceTest, plane)
     auto ngp = tool.num_gridpoints();
     EXPECT_EQ(ngp, npts * npts);
     // Check output value
-    int nout = tool.check_output("~", liwl);
+    int nout = tool.check_output("~", water_level1);
     ASSERT_EQ(nout, npts * npts);
 }
 
@@ -543,16 +398,15 @@ TEST_F(FreeSurfaceTest, sloped)
     amrex::Vector<amrex::Real> out_vec;
     out_vec.resize(npts * npts, 0.0);
     // Step in x, then y
-    // Most calcuations done by hand, not shown
-    out_vec[0] = water_level2 + 2.0 * (0.5 - 0.375) / (0.375 - 1.0);
-    out_vec[1] = water_level2 + 2.0 * (0.5 - 0.4375) / (0.4375 - 1.0);
-    out_vec[2] = water_level2;
-    out_vec[3] = water_level2 + 2.0 * (0.5 - 0.4375) / (0.4375 - 1.0);
-    out_vec[4] = water_level2;
-    out_vec[5] = water_level2 + 2.0 * (0.5 - 0.5625) / (0.0 - 0.5625);
-    out_vec[6] = water_level2;
-    out_vec[7] = water_level2 + 2.0 * (0.5 - 0.5625) / (0.0 - 0.5625);
-    out_vec[8] = water_level2 + 2.0 * (0.5 - 0.625) / (0.0 - 0.625);
+    out_vec[0] = water_level2 + slope * (-1.0 - 1.0);
+    out_vec[1] = water_level2 + slope * (+0.0 - 1.0);
+    out_vec[2] = water_level2 + slope * (+1.0 - 1.0);
+    out_vec[3] = water_level2 + slope * (-1.0 + 0.0);
+    out_vec[4] = water_level2 + slope * (+0.0 + 0.0);
+    out_vec[5] = water_level2 + slope * (+1.0 + 0.0);
+    out_vec[6] = water_level2 + slope * (-1.0 + 1.0);
+    out_vec[7] = water_level2 + slope * (+0.0 + 1.0);
+    out_vec[8] = water_level2 + slope * (+1.0 + 1.0);
     // Check output value
     int nout = tool.check_output_vec("~", out_vec);
     ASSERT_EQ(nout, npts * npts);

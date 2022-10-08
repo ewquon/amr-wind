@@ -20,6 +20,7 @@ void incflo::set_inflow_velocity(
         auto& abl = phy_mgr.get<amr_wind::ABL>();
         const auto& bndry_plane = abl.bndry_plane();
         bndry_plane.populate_data(lev, time, lvelocity, vel);
+        abl.abl_mpl().set_velocity(lev, time, lvelocity, vel);
     }
 }
 
@@ -156,7 +157,7 @@ void incflo::ApplyProjection(
     if (!incremental) {
         for (int lev = 0; lev <= finest_level; lev++) {
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
             for (MFIter mfi(velocity(lev), TilingIfNotGPU()); mfi.isValid();
@@ -191,7 +192,7 @@ void incflo::ApplyProjection(
     if (add_surface_tension && !incremental) {
         // Create the Surface tension forcing term (Cell-centered)
         for (int lev = 0; lev <= finest_level; ++lev) {
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
             {
@@ -247,7 +248,7 @@ void incflo::ApplyProjection(
         for (int lev = 0; lev <= finest_level; ++lev) {
             sigma[lev].define(
                 grids[lev], dmap[lev], ncomp, 0, MFInfo(), Factory(lev));
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
             for (MFIter mfi(sigma[lev], TilingIfNotGPU()); mfi.isValid();
@@ -318,7 +319,7 @@ void incflo::ApplyProjection(
         nodal_projector->computeRHS(div_vel_rhs->vec_ptrs(), vel, {}, {});
         // Mask the righ-hand side of the Poisson solve for the nodes inside the
         // body
-        auto& imask_node = repo().get_int_field("mask_node");
+        const auto& imask_node = repo().get_int_field("mask_node");
         for (int lev = 0; lev <= finest_level; ++lev) {
             amrex::MultiFab::Multiply(
                 *div_vel_rhs->vec_ptrs()[lev],
@@ -330,7 +331,7 @@ void incflo::ApplyProjection(
     // Setup masking for overset simulations
     if (sim().has_overset()) {
         auto& linop = nodal_projector->getLinOp();
-        auto& imask_node = repo().get_int_field("mask_node");
+        const auto& imask_node = repo().get_int_field("mask_node");
         for (int lev = 0; lev <= finest_level; ++lev) {
             linop.setOversetMask(lev, imask_node(lev));
         }
@@ -373,7 +374,7 @@ void incflo::ApplyProjection(
 
     for (int lev = 0; lev <= finest_level; lev++) {
 
-#ifdef _OPENMP
+#ifdef AMREX_USE_OMP
 #pragma omp parallel if (Gpu::notInLaunchRegion())
 #endif
         for (MFIter mfi(grad_p(lev), TilingIfNotGPU()); mfi.isValid(); ++mfi) {
