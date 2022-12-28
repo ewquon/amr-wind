@@ -28,6 +28,15 @@ void godunov::compute_fluxes(
     godunov::scheme godunov_scheme)
 {
 
+    /* iconserv functionality: (would be better served by two flags)
+     * ------------------------------------------------------------------------
+     * == 0 : non-conservative formulation of interpolation, fluxes not
+     *        multiplied by MAC velocity
+     * == 1 : conservative formulation of interpolation, fluxes include factor
+     *        of MAC velocity
+     * (!= 1 && != 0) : conservative formulation of interpolation, fluxes not
+     *        multiplied by MAC velocity */
+
     BL_PROFILE("amr-wind::godunov::compute_fluxes");
     Box const& xbx = amrex::surroundingNodes(bx, 0);
     Box const& ybx = amrex::surroundingNodes(bx, 1);
@@ -353,7 +362,7 @@ void godunov::compute_fluxes(
                      ? 0.5 * (stl + sth)
                      : qx;
 
-            if (iconserv[n] != 0) {
+            if (iconserv[n] == 1) {
                 fx(i, j, k, n) = umac(i, j, k) * qx;
             } else {
                 fx(i, j, k, n) = qx;
@@ -460,7 +469,7 @@ void godunov::compute_fluxes(
                      ? 0.5 * (stl + sth)
                      : qy;
 
-            if (iconserv[n] != 0) {
+            if (iconserv[n] == 1) {
                 fy(i, j, k, n) = vmac(i, j, k) * qy;
             } else {
                 fy(i, j, k, n) = qy;
@@ -566,48 +575,10 @@ void godunov::compute_fluxes(
                      ? 0.5 * (stl + sth)
                      : qz;
 
-            if (iconserv[n] != 0) {
+            if (iconserv[n] == 1) {
                 fz(i, j, k, n) = wmac(i, j, k) * qz;
             } else {
                 fz(i, j, k, n) = qz;
-            }
-        });
-}
-
-void godunov::compute_advection(
-    int lev,
-    Box const& bx,
-    int ncomp,
-    Array4<Real> const& dqdt,
-    Array4<Real> const& fx,
-    Array4<Real> const& fy,
-    Array4<Real> const& fz,
-    Array4<Real const> const& umac,
-    Array4<Real const> const& vmac,
-    Array4<Real const> const& wmac,
-    int const* iconserv,
-    Vector<amrex::Geometry> geom)
-{
-
-    BL_PROFILE("amr-wind::godunov::compute_advection");
-
-    const auto dxinv = geom[lev].InvCellSizeArray();
-
-    amrex::ParallelFor(
-        bx, ncomp, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
-            if (iconserv[n] != 0) {
-                dqdt(i, j, k, n) =
-                    dxinv[0] * (fx(i, j, k, n) - fx(i + 1, j, k, n)) +
-                    dxinv[1] * (fy(i, j, k, n) - fy(i, j + 1, k, n)) +
-                    dxinv[2] * (fz(i, j, k, n) - fz(i, j, k + 1, n));
-            } else {
-                dqdt(i, j, k, n) =
-                    0.5 * dxinv[0] * (umac(i, j, k) + umac(i + 1, j, k)) *
-                        (fx(i, j, k, n) - fx(i + 1, j, k, n)) +
-                    0.5 * dxinv[1] * (vmac(i, j, k) + vmac(i, j + 1, k)) *
-                        (fy(i, j, k, n) - fy(i, j + 1, k, n)) +
-                    0.5 * dxinv[2] * (wmac(i, j, k) + wmac(i, j, k + 1)) *
-                        (fz(i, j, k, n) - fz(i, j, k + 1, n));
             }
         });
 }

@@ -1,9 +1,7 @@
 #include "amr-wind/wind_energy/actuator/actuator_utils.H"
 #include "amr-wind/wind_energy/actuator/actuator_types.H"
 
-namespace amr_wind {
-namespace actuator {
-namespace utils {
+namespace amr_wind::actuator::utils {
 
 namespace {
 
@@ -103,7 +101,8 @@ void determine_root_proc(ActInfo& info, amrex::Vector<int>& act_proc_count)
     // Determine the MPI rank that contains the fewest turbines
     auto it = std::min_element(act_proc_count.begin(), act_proc_count.end());
     // Make it the root process for this turbine
-    info.root_proc = std::distance(act_proc_count.begin(), it);
+    info.root_proc =
+        static_cast<int>(std::distance(act_proc_count.begin(), it));
     // Make sure the root process is part of the process list
     plist.insert(info.root_proc);
     // Increment turbine count with the global tracking array
@@ -121,6 +120,4 @@ void determine_root_proc(ActInfo& info, amrex::Vector<int>& act_proc_count)
     }
 }
 
-} // namespace utils
-} // namespace actuator
-} // namespace amr_wind
+} // namespace amr_wind::actuator::utils

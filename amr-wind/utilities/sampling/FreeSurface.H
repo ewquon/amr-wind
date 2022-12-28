@@ -17,8 +17,7 @@
  *  \ingroup utilities
  */
 
-namespace amr_wind {
-namespace free_surface {
+namespace amr_wind::free_surface {
 
 /** Collection of data sampling objects
  *  \ingroup findinterface
@@ -45,7 +44,8 @@ public:
     //! Interpolate fields at a given timestep and output to disk
     void post_advance_work() override;
 
-    void post_regrid_actions() override {}
+    //! Redo some of the initialization work when the grid changes
+    void post_regrid_actions() override;
 
     //! Output functions for private variables
     //! Number of points
@@ -128,7 +128,6 @@ private:
     int m_ncmax{8};
 };
 
-} // namespace free_surface
-} // namespace amr_wind
+} // namespace amr_wind::free_surface
 
 #endif /* FREESURFACE_H */

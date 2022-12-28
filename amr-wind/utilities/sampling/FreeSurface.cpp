@@ -7,8 +7,7 @@
 
 #include "AMReX_ParmParse.H"
 
-namespace amr_wind {
-namespace free_surface {
+namespace amr_wind::free_surface {
 
 FreeSurface::FreeSurface(CFDSim& sim, std::string label)
     : m_sim(sim), m_label(std::move(label)), m_vof(sim.repo().get_field("vof"))
@@ -59,13 +58,15 @@ void FreeSurface::initialize()
         }
         }
     }
+    // Small number for floating-point comparisons
+    constexpr amrex::Real eps = 1.0e-16;
 
     // Calculate total number of points
     m_npts = m_npts_dir[0] * m_npts_dir[1];
 
     // Turn parameters into 2D grid
     m_locs.resize(m_npts);
-    m_out.resize(m_npts * m_ninst);
+    m_out.resize(static_cast<long>(m_npts) * m_ninst);
 
     // Get size of sample grid spacing
     amrex::Real dxs0 =
@@ -142,19 +143,22 @@ void FreeSurface::initialize()
                         int n1_a = 0;
                         // Get first and after sample indices for gc0
                         if (ntps0 == 1) {
-                            n0_a = ((phi[gc0] == s_gc0) ||
-                                    (xm[gc0] - s_gc0 <= 0.5 * dx[gc0] &&
-                                     s_gc0 - xm[gc0] < 0.5 * dx[gc0]))
-                                       ? 1
-                                       : 0;
+                            n0_a =
+                                ((amrex::Math::abs(phi[gc0] - s_gc0) < eps) ||
+                                 (xm[gc0] - s_gc0 <= 0.5 * dx[gc0] &&
+                                  s_gc0 - xm[gc0] < 0.5 * dx[gc0]))
+                                    ? 1
+                                    : 0;
                         } else {
                             n0_f = (int)amrex::Math::ceil(
                                 (xm[gc0] - 0.5 * dx[gc0] - s_gc0) / dxs0);
                             n0_a = (int)amrex::Math::ceil(
                                 (xm[gc0] + 0.5 * dx[gc0] - s_gc0) / dxs0);
                             // Edge case of phi
-                            if (xm[gc0] + 0.5 * dx[gc0] == phi[gc0] &&
-                                s_gc0 + n0_a * dxs0 == phi[gc0]) {
+                            if (amrex::Math::abs(
+                                    xm[gc0] + 0.5 * dx[gc0] - phi[gc0]) < eps &&
+                                amrex::Math::abs(
+                                    s_gc0 + n0_a * dxs0 - phi[gc0]) < eps) {
                                 ++n0_a;
                             }
                             // Bounds
@@ -167,7 +171,7 @@ void FreeSurface::initialize()
                         }
                         // Get first and after sample indices for gc1
                         if (ntps1 == 1) {
-                            n1_a = ((phi[gc1] == s_gc1) ||
+                            n1_a = (amrex::Math::abs(phi[gc1] - s_gc1) < eps ||
                                     (xm[gc1] - s_gc1 <= 0.5 * dx[gc1] &&
                                      s_gc1 - xm[gc1] < 0.5 * dx[gc1]))
                                        ? 1
@@ -178,8 +182,10 @@ void FreeSurface::initialize()
                             n1_a = (int)amrex::Math::ceil(
                                 (xm[gc1] + 0.5 * dx[gc1] - s_gc1) / dxs1);
                             // Edge case of phi
-                            if (xm[gc1] + 0.5 * dx[gc1] == phi[gc1] &&
-                                s_gc1 + n1_a * dxs1 == phi[gc1]) {
+                            if (amrex::Math::abs(
+                                    xm[gc1] + 0.5 * dx[gc1] - phi[gc1]) < eps &&
+                                amrex::Math::abs(
+                                    s_gc1 + n1_a * dxs1 - phi[gc1]) < eps) {
                                 ++n1_a;
                             }
                             // Bounds
@@ -204,8 +210,10 @@ void FreeSurface::initialize()
     m_ncomp = ncomp;
 
     // Declare fields for search
-    auto& floc = m_sim.repo().declare_field("sample_loc", 2 * ncomp, 0, 1);
-    auto& fidx = m_sim.repo().declare_field("sample_idx", ncomp, 0, 1);
+    auto& floc =
+        m_sim.repo().declare_field("sample_loc_" + m_label, 2 * ncomp, 0, 1);
+    auto& fidx =
+        m_sim.repo().declare_field("sample_idx_" + m_label, ncomp, 0, 1);
 
     // Store locations and indices in fields
     for (int lev = 0; lev <= finest_level; lev++) {
@@ -247,7 +255,7 @@ void FreeSurface::initialize()
                     int n1_a = 0;
                     // Get first and after sample indices for gc0
                     if (ntps0 == 1) {
-                        n0_a = ((phi[gc0] == s_gc0) ||
+                        n0_a = (amrex::Math::abs(phi[gc0] - s_gc0) < eps ||
                                 (xm[gc0] - s_gc0 <= 0.5 * dx[gc0] &&
                                  s_gc0 - xm[gc0] < 0.5 * dx[gc0]))
                                    ? 1
@@ -258,8 +266,10 @@ void FreeSurface::initialize()
                         n0_a = (int)amrex::Math::ceil(
                             (xm[gc0] + 0.5 * dx[gc0] - s_gc0) / dxs0);
                         // Edge case of phi
-                        if (xm[gc0] + 0.5 * dx[gc0] == phi[gc0] &&
-                            s_gc0 + n0_a * dxs0 == phi[gc0]) {
+                        if (amrex::Math::abs(
+                                xm[gc0] + 0.5 * dx[gc0] - phi[gc0]) < eps &&
+                            amrex::Math::abs(s_gc0 + n0_a * dxs0 - phi[gc0]) <
+                                eps) {
                             ++n0_a;
                         }
                         // Bounds
@@ -272,7 +282,7 @@ void FreeSurface::initialize()
                     }
                     // Get first and after sample indices for gc1
                     if (ntps1 == 1) {
-                        n1_a = ((phi[gc1] == s_gc1) ||
+                        n1_a = (amrex::Math::abs(phi[gc1] - s_gc1) < eps ||
                                 (xm[gc1] - s_gc1 <= 0.5 * dx[gc1] &&
                                  s_gc1 - xm[gc1] < 0.5 * dx[gc1]))
                                    ? 1
@@ -283,8 +293,10 @@ void FreeSurface::initialize()
                         n1_a = (int)amrex::Math::ceil(
                             (xm[gc1] + 0.5 * dx[gc1] - s_gc1) / dxs1);
                         // Edge case of phi
-                        if (xm[gc1] + 0.5 * dx[gc1] == phi[gc1] &&
-                            s_gc1 + n1_a * dxs1 == phi[gc1]) {
+                        if (amrex::Math::abs(
+                                xm[gc1] + 0.5 * dx[gc1] - phi[gc1]) < eps &&
+                            amrex::Math::abs(s_gc1 + n1_a * dxs1 - phi[gc1]) <
+                                eps) {
                             ++n1_a;
                         }
                         // Bounds
@@ -355,8 +367,8 @@ void FreeSurface::post_advance_work()
     auto* dlst_ptr = dout_last.data();
 
     // Get working fields
-    auto& fidx = m_sim.repo().get_field("sample_idx");
-    auto& floc = m_sim.repo().get_field("sample_loc");
+    auto& fidx = m_sim.repo().get_field("sample_idx_" + m_label);
+    auto& floc = m_sim.repo().get_field("sample_loc_" + m_label);
 
     const int finest_level = m_vof.repo().num_active_levels() - 1;
 
@@ -430,11 +442,11 @@ void FreeSurface::post_advance_work()
                                 bool calc_flag = false;
                                 if ((ni % 2 == 0 &&
                                      vof_arr(i, j, k) >= 1.0 - 1e-12) ||
-                                    (ni % 2 == 1 &&
+                                    (ni % 2 != 0 &&
                                      vof_arr(i, j, k) <= 1e-12)) {
                                     // put bdy at top
                                     alpha = 1.0;
-                                    if (ni % 2 == 1) {
+                                    if (ni % 2 != 0) {
                                         mx *= -1.0;
                                         my *= -1.0;
                                         mz *= -1.0;
@@ -515,14 +527,14 @@ void FreeSurface::post_advance_work()
         // Copy information back from device
         amrex::Gpu::copy(
             amrex::Gpu::deviceToHost, dout.begin(), dout.end(),
-            &m_out[ni * m_npts]);
+            &m_out[static_cast<long>(ni) * m_npts]);
         // Make consistent across parallelization
         for (int n = 0; n < m_npts; n++) {
             amrex::ParallelDescriptor::ReduceRealMax(m_out[ni * m_npts + n]);
         }
         // Copy last m_out to device vector of results of last instance
         amrex::Gpu::copy(
-            amrex::Gpu::hostToDevice, &m_out[ni * m_npts],
+            amrex::Gpu::hostToDevice, &m_out[static_cast<long>(ni) * m_npts],
             &m_out[(ni + 1) * m_npts - 1] + 1, dout_last.begin());
         // Reset current output device vector
         for (int n = 0; n < m_npts; n++) {
@@ -531,6 +543,150 @@ void FreeSurface::post_advance_work()
     }
 
     process_output();
+}
+
+void FreeSurface::post_regrid_actions()
+{
+    BL_PROFILE("amr-wind::FreeSurface::post_regrid_actions");
+    // Small number for floating-point comparisons
+    constexpr amrex::Real eps = 1.0e-16;
+    // Get working fields
+    auto& fidx = m_sim.repo().get_field("sample_idx_" + m_label);
+    auto& floc = m_sim.repo().get_field("sample_loc_" + m_label);
+    // Provide variables from class to device
+    const int ncomp = m_ncomp;
+    const int ntps0 = m_npts_dir[0];
+    const int ntps1 = m_npts_dir[1];
+    const int gc0 = m_gc0;
+    const int gc1 = m_gc1;
+    const amrex::Real s_gc0 = m_start[m_gc0];
+    const amrex::Real s_gc1 = m_start[m_gc1];
+    const amrex::Real dxs0 =
+        (m_end[m_gc0] - m_start[m_gc0]) / amrex::max(m_npts_dir[0] - 1, 1);
+    const amrex::Real dxs1 =
+        (m_end[m_gc1] - m_start[m_gc1]) / amrex::max(m_npts_dir[1] - 1, 1);
+
+    // Store locations and indices in fields
+    const int finest_level = m_vof.repo().num_active_levels() - 1;
+    for (int lev = 0; lev <= finest_level; lev++) {
+        // Use level_mask to only count finest level present
+        amrex::iMultiFab level_mask;
+        if (lev < finest_level) {
+            level_mask = makeFineMask(
+                m_sim.mesh().boxArray(lev), m_sim.mesh().DistributionMap(lev),
+                m_sim.mesh().boxArray(lev + 1), amrex::IntVect(2), 1, 0);
+        } else {
+            level_mask.define(
+                m_sim.mesh().boxArray(lev), m_sim.mesh().DistributionMap(lev),
+                1, 0, amrex::MFInfo());
+            level_mask.setVal(1);
+        }
+        // Get geometry information
+        const auto& geom = m_sim.mesh().Geom(lev);
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dx =
+            geom.CellSizeArray();
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> plo =
+            geom.ProbLoArray();
+        const amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> phi =
+            geom.ProbHiArray();
+        for (amrex::MFIter mfi(floc(lev)); mfi.isValid(); ++mfi) {
+            auto loc_arr = floc(lev).array(mfi);
+            auto idx_arr = fidx(lev).array(mfi);
+            auto mask_arr = level_mask.const_array(mfi);
+            const auto& vbx = mfi.validbox();
+            amrex::ParallelFor(
+                vbx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    // Cell location
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> xm;
+                    xm[0] = plo[0] + (i + 0.5) * dx[0];
+                    xm[1] = plo[1] + (j + 0.5) * dx[1];
+                    xm[2] = plo[2] + (k + 0.5) * dx[2];
+                    int n0_f = 0;
+                    int n0_a = 0;
+                    int n1_f = 0;
+                    int n1_a = 0;
+                    // Get first and after sample indices for gc0
+                    if (ntps0 == 1) {
+                        n0_a = (amrex::Math::abs(phi[gc0] - s_gc0) < eps ||
+                                (xm[gc0] - s_gc0 <= 0.5 * dx[gc0] &&
+                                 s_gc0 - xm[gc0] < 0.5 * dx[gc0]))
+                                   ? 1
+                                   : 0;
+                    } else {
+                        n0_f = (int)amrex::Math::ceil(
+                            (xm[gc0] - 0.5 * dx[gc0] - s_gc0) / dxs0);
+                        n0_a = (int)amrex::Math::ceil(
+                            (xm[gc0] + 0.5 * dx[gc0] - s_gc0) / dxs0);
+                        // Edge case of phi
+                        if (amrex::Math::abs(
+                                xm[gc0] + 0.5 * dx[gc0] - phi[gc0]) < eps &&
+                            amrex::Math::abs(s_gc0 + n0_a * dxs0 - phi[gc0]) <
+                                eps) {
+                            ++n0_a;
+                        }
+                        // Bounds
+                        n0_a = amrex::min(ntps0, n0_a);
+                        n0_f = amrex::max(amrex::min(0, n0_a), n0_f);
+                        // Out of bounds indicates no sample point
+                        if (n0_f >= ntps0 || n0_f < 0) {
+                            n0_a = n0_f;
+                        }
+                    }
+                    // Get first and after sample indices for gc1
+                    if (ntps1 == 1) {
+                        n1_a = (amrex::Math::abs(phi[gc1] - s_gc1) < eps ||
+                                (xm[gc1] - s_gc1 <= 0.5 * dx[gc1] &&
+                                 s_gc1 - xm[gc1] < 0.5 * dx[gc1]))
+                                   ? 1
+                                   : 0;
+                    } else {
+                        n1_f = (int)amrex::Math::ceil(
+                            (xm[gc1] - 0.5 * dx[gc1] - s_gc1) / dxs1);
+                        n1_a = (int)amrex::Math::ceil(
+                            (xm[gc1] + 0.5 * dx[gc1] - s_gc1) / dxs1);
+                        // Edge case of phi
+                        if (amrex::Math::abs(
+                                xm[gc1] + 0.5 * dx[gc1] - phi[gc1]) < eps &&
+                            amrex::Math::abs(s_gc1 + n1_a * dxs1 - phi[gc1]) <
+                                eps) {
+                            ++n1_a;
+                        }
+                        // Bounds
+                        n1_a = amrex::min(ntps1, n1_a);
+                        n1_f = amrex::max(amrex::min(0, n1_a), n1_f);
+                        // Out of bounds indicates no sample point
+                        if (n1_f >= ntps1 || n1_f < 0) {
+                            n1_a = n1_f;
+                        }
+                    }
+                    // Loop through local sample locations
+                    int ns = 0;
+                    for (int n0 = n0_f; n0 < n0_a; ++n0) {
+                        for (int n1 = n1_f; n1 < n1_a; ++n1) {
+                            // Save index and location
+                            idx_arr(i, j, k, ns) = (amrex::Real)n1 * ntps0 + n0;
+                            loc_arr(i, j, k, 2 * ns) = s_gc0 + n0 * dxs0;
+                            loc_arr(i, j, k, 2 * ns + 1) = s_gc1 + n1 * dxs1;
+                            // Advance to next point
+                            ++ns;
+                            // if ns gets to max components, break
+                            if (ns == ncomp) {
+                                break;
+                            }
+                        }
+                        if (ns == ncomp) {
+                            break;
+                        }
+                    }
+                    // Set remaining values to -1 to indicate no point
+                    // or set all values to -1 if not in fine mesh
+                    int nstart = (mask_arr(i, j, k) == 0) ? 0 : ns;
+                    for (int n = nstart; n < ncomp; ++n) {
+                        idx_arr(i, j, k, n) = -1.0;
+                    }
+                });
+        }
+    }
 }
 
 void FreeSurface::process_output()
@@ -703,5 +859,4 @@ void FreeSurface::write_netcdf()
 #endif
 }
 
-} // namespace free_surface
-} // namespace amr_wind
+} // namespace amr_wind::free_surface

@@ -129,6 +129,7 @@ public:
 
     // for cuda
     void ComputeDt(bool explicit_diffusion);
+    void ComputePrescribeDt();
 
     void set_inflow_velocity(
         int lev, amrex::Real time, amrex::MultiFab& vel, int nghost);
@@ -168,8 +169,7 @@ private:
 
     bool m_constant_density = true;
 
-    // Default to MOL (not Godunov)
-    bool m_use_godunov = false;
+    bool m_use_godunov = true;
 
     // Prescribe advection velocity
     bool m_prescribe_vel = false;
@@ -190,7 +190,7 @@ private:
 
     bool need_divtau() const
     {
-        return !(!m_use_godunov and DiffusionType::Implicit == m_diff_type);
+        return (m_use_godunov || (DiffusionType::Implicit != m_diff_type));
     }
 
     amrex::Array<amrex::LinOpBCType, AMREX_SPACEDIM>

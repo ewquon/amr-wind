@@ -8,8 +8,7 @@
 #include "amr-wind/wind_energy/actuator/ActParser.H"
 #include "amr-wind/wind_energy/actuator/FLLCOp.H"
 
-namespace amr_wind {
-namespace actuator {
+namespace amr_wind::actuator {
 namespace wing {
 
 /** Parse common data for modeling fixed wings as actuators
@@ -217,7 +216,6 @@ public:
 };
 
 } // namespace ops
-} // namespace actuator
-} // namespace amr_wind
+} // namespace amr_wind::actuator
 
 #endif /* WING_OPS_H */
