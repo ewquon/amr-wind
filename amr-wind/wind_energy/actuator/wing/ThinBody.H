@@ -1,5 +1,5 @@
-#ifndef NO_PENETRATION_H
-#define NO_PENETRATION_H
+#ifndef NO_THINBODY_H
+#define NO_THINBODY_H
 
 #include "amr-wind/wind_energy/actuator/wing/ActuatorWing.H"
 
@@ -31,4 +31,4 @@ struct ThinBody : public WingType
 } // namespace actuator
 } // namespace amr_wind
 
-#endif /* NO_PENETRATION_H */
+#endif /* NO_THINBODY_H */

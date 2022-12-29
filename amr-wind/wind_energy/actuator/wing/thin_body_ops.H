@@ -119,6 +119,7 @@ struct InitDataOp<ThinBody, ActSrcLine>
 {
     void operator()(ThinBody::DataType& data)
     {
+        // this sets up the actuator grid  
         wing::init_data_structures(data.meta(), data.grid());
 
         auto& meta = data.meta();
