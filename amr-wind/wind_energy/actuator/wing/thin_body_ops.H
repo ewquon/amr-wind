@@ -1,18 +1,18 @@
-#ifndef NO_PENETRATION_OPS_H
-#define NO_PENETRATION_OPS_H
+#ifndef THIN_BODY_OPS_H
+#define THIN_BODY_OPS_H
 
 #include "amr-wind/wind_energy/actuator/wing/ThinBody.H"
 #include "amr-wind/wind_energy/actuator/actuator_ops.H"
 #include "amr-wind/utilities/linear_interpolation.H"
+#include "amr-wind/wind_energy/actuator/FLLCOp.H" // to avoid incomplete type 'amr_wind::actuator::FLLCData' error
 
-namespace amr_wind {
-namespace actuator {
+namespace amr_wind::actuator {
 namespace wing {
 
 /** Parse common data for modeling fixed wings as actuators
 
     Copied from wing_ops.H
-    vvvvvvvvvvvvvvvvvvvvvv
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
  */
 void read_inputs(
     WingBaseData& /*wdata*/, ActInfo& /*info*/, const utils::ActParser& /*pp*/);
@@ -34,18 +34,41 @@ void write_netcdf(
     const ActGrid& /*grid*/,
     const amrex::Real /*time*/);
 
+template <typename T>
+ComponentView make_component_view(typename T::DataType& data)
+{
+    auto& grid = data.grid();
+    auto& meta = data.meta();
+    ComponentView view;
+    view.pos = ::amr_wind::utils::slice(grid.pos, 0, meta.num_pts);
+    view.vel_pos = ::amr_wind::utils::slice(grid.vel_pos, 0, meta.num_pts);
+    view.force = ::amr_wind::utils::slice(grid.force, 0, meta.num_pts);
+    view.epsilon = ::amr_wind::utils::slice(grid.epsilon, 0, meta.num_pts);
+    view.orientation =
+        ::amr_wind::utils::slice(grid.orientation, 0, meta.num_pts);
+    view.chord = ::amr_wind::utils::slice(meta.chord, 0, meta.num_pts);
+    view.vel_rel = ::amr_wind::utils::slice(meta.vel_rel, 0, meta.num_pts);
+    view.vel = ::amr_wind::utils::slice(grid.vel, 0, meta.num_pts);
+
+    return view;
+}
+
 } // namespace wing
 
-
-/** NoPenetration actuator specific
-    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
- */
 namespace ops {
 
+/** based on fixed_wing_ops.H
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+  - removed airfoil table lookup
+  - add params `gain`, `num_chord_points` (not yet implemented)
+  - no FLLC
+ */
+
 template <>
-struct ReadInputsOp<NoPenetration, ActSrcLine>
+struct ReadInputsOp<ThinBody, ActSrcLine>
 {
-    void operator()(NoPenetration::DataType& data, const utils::ActParser& pp)
+    void operator()(ThinBody::DataType& data, const utils::ActParser& pp)
     {
         auto& wdata = data.meta();
         auto& info = data.info();
@@ -92,9 +115,9 @@ struct ReadInputsOp<NoPenetration, ActSrcLine>
 };
 
 template <>
-struct InitDataOp<NoPenetration, ActSrcLine>
+struct InitDataOp<ThinBody, ActSrcLine>
 {
-    void operator()(NoPenetration::DataType& data)
+    void operator()(ThinBody::DataType& data)
     {
         wing::init_data_structures(data.meta(), data.grid());
 
@@ -126,9 +149,11 @@ struct InitDataOp<NoPenetration, ActSrcLine>
     }
 };
 
-/* Copied from wing_ops.H -- removed airfoil lookup from ComputeForceOp
-   vvvvvvvvvvvvvvvvvvvvvv
-*/
+/** Copied from wing_ops.H
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+  - no FLLC
+ */
 
 template <typename ActTrait, typename SrcTrait>
 struct UseDefaultOp
@@ -162,8 +187,8 @@ struct UpdateVelOp<
 };
 
 
-/** NoPenetration actuator specific
-    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+/** specific to ThinBody actuator
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
  */
 
 template <typename ActTrait>
@@ -244,6 +269,10 @@ struct ComputeForceOp<
     }
 };
 
+/** Copied from wing_ops.H
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+ */
+
 template <typename ActTrait, typename SrcTrait>
 struct ProcessOutputsOp<
     ActTrait,
@@ -290,7 +319,6 @@ public:
 };
 
 } // namespace ops
-} // namespace actuator
-} // namespace amr_wind
+} // namespace amr_wind::actuator
 
-#endif /* NO_PENETRATION_OPS_H */
+#endif /* THIN_BODY_OPS_H */

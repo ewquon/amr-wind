@@ -6,7 +6,7 @@
 namespace amr_wind {
 namespace actuator {
 
-struct NoPenetrationData : public WingBaseData
+struct ThinBodyData : public WingBaseData
 {
     //int num_pts; // number of points along the span (defined in WingBaseData) 
     int num_chord_pts; // number of points along the chord (NOT IMPLEMENTED)
@@ -18,14 +18,14 @@ struct NoPenetrationData : public WingBaseData
     vs::Vector epsilon_chord;
 };
 
-struct NoPenetration : public WingType
+struct ThinBody : public WingType
 {
     using InfoType = ActInfo;
     using GridType = ActGrid;
-    using MetaType = NoPenetrationData;
-    using DataType = ActDataHolder<NoPenetration>;
+    using MetaType = ThinBodyData;
+    using DataType = ActDataHolder<ThinBody>;
 
-    static std::string identifier() { return "NoPenetration"; }
+    static std::string identifier() { return "ThinBody"; }
 };
 
 } // namespace actuator
