@@ -225,9 +225,8 @@ struct ComputeForceOp<
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
             wvel_normal.y() = 0.0; // don't need this
-            //force_local = wdata.gain * -wvel_normal / dt;
-            //grid.force[ip] = force_local & tmat;
-            grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt;
+            auto force_local = wdata.gain * -wvel_normal / dt;
+            grid.force[ip] = force_local & tmat; // local --> inertial frame
 
             if (DEBUG) {
                 // Determine unit vector parallel and perpendicular to velocity vector
@@ -249,8 +248,10 @@ struct ComputeForceOp<
             const auto vmag = vs::mag(wvel);
             const auto aoa = std::atan2(wvel.z(), wvel.x());
             const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = 0.0; // force_local[2]
-            const auto drag = 0.0; // force_local[0]
+            const auto drag_dir = wvel.unit();
+            const auto lift_dir = drag_dir ^ tmat.y();
+            amrex::Real lift = grid.force[ip] & lift_dir;
+            amrex::Real drag = grid.force[ip] & drag_dir;
             cl = lift / qval;
             cd = drag / qval;
 
