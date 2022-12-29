@@ -1,7 +1,7 @@
 #ifndef NO_PENETRATION_OPS_H
 #define NO_PENETRATION_OPS_H
 
-#include "amr-wind/wind_energy/actuator/wing/NoPenetration.H"
+#include "amr-wind/wind_energy/actuator/wing/ThinBody.H"
 #include "amr-wind/wind_energy/actuator/actuator_ops.H"
 #include "amr-wind/utilities/linear_interpolation.H"
 
