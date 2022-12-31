@@ -4,7 +4,7 @@
 #include "amr-wind/wind_energy/actuator/wing/ThinBody.H"
 #include "amr-wind/wind_energy/actuator/actuator_ops.H"
 #include "amr-wind/utilities/linear_interpolation.H"
-#include "amr-wind/wind_energy/actuator/FLLCOp.H" // to avoid incomplete type 'amr_wind::actuator::FLLCData' error
+#include "amr-wind/wind_energy/actuator/FLLCOp.H"
 
 namespace amr_wind::actuator {
 namespace wing {
@@ -62,7 +62,6 @@ namespace ops {
 
   - removed airfoil table lookup
   - add params `gain`, `num_chord_points` (not yet implemented)
-  - no FLLC
  */
 
 template <>
@@ -83,9 +82,16 @@ struct ReadInputsOp<ThinBody, ActSrcLine>
         pp.queryarr("span_locs", wdata.span_locs);
         pp.queryarr("chord", wdata.chord_inp);
 
+        bool use_fllc = false;
+        pp.query("fllc", use_fllc);
+        if (use_fllc) {
+            wdata.fllc = std::make_unique<FLLCData>();
+            FLLCParse(pp, *(wdata.fllc));
+        }
+
         if (!pp.contains("epsilon") && !pp.contains("epsilon_chord")) {
             amrex::Abort(
-                "Actuator fixed wing requires specification of one or both "
+                "Actuator thin body requires specification of one or both "
                 "of 'epsilon' or 'epsilon_chord'");
         }
 
@@ -152,8 +158,6 @@ struct InitDataOp<ThinBody, ActSrcLine>
 
 /** Copied from wing_ops.H
     ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-  - no FLLC
  */
 
 template <typename ActTrait, typename SrcTrait>
@@ -184,7 +188,13 @@ struct UpdateVelOp<
         std::is_base_of<WingType, ActTrait>::value &&
         UseDefaultOp<ActTrait, ActSrcLine>::update_vel>::type>
 {
-    void operator()(typename ActTrait::DataType& /*unused*/) {}
+    void operator()(typename ActTrait::DataType& data)
+    {
+        auto& meta = data.meta();
+        if (meta.fllc) {
+            FLLCOp()(meta.component_view, *(meta.fllc));
+        }
+    }
 };
 
 
@@ -268,6 +278,17 @@ struct ComputeForceOp<
 
         wdata.lift = total_lift;
         wdata.drag = total_drag;
+
+        if (wdata.fllc) {
+            if (!(wdata.fllc->initialized)) {
+                wdata.component_view =
+                    amr_wind::actuator::wing::make_component_view<ActTrait>(
+                        data);
+                FLLCInit(
+                    *(wdata.fllc.get()), wdata.component_view,
+                    wdata.epsilon_chord[0]);
+            }
+        }
     }
 };
 
