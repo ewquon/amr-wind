@@ -4,6 +4,7 @@
 #include "amr-wind/core/Factory.H"
 #include "amr-wind/wind_energy/actuator/actuator_types.H"
 #include "amr-wind/wind_energy/actuator/actuator_ops.H"
+#include "amr-wind/wind_energy/actuator/VelAvgOp.H"
 #include "amr-wind/wind_energy/actuator/ActSrcLineOp.H"
 #include "amr-wind/wind_energy/actuator/turbine/ActSrcDiskOp_Turbine.H"
 #include "amr-wind/wind_energy/actuator/disk/ActSrcDiskOp.H"
@@ -51,7 +52,15 @@ public:
 
     virtual void update_positions(VecSlice&) = 0;
 
-    virtual void update_fields(const VecSlice&, const RealSlice&) = 0;
+    virtual void update_fields(
+        const VecSlice&,
+        const RealSlice&,
+        bool update) = 0;
+
+    virtual void sample_weighted_vel(
+        const int lev,
+        const amrex::MFIter& mfi,
+        const amrex::Geometry& geom) = 0;
 
     virtual void compute_forces() = 0;
 
@@ -86,6 +95,9 @@ private:
     //! Instance that holds all data related to a particular actuator type
     typename ActTrait::DataType m_data;
 
+    //! Velocity averaging operator
+    ops::VelAvgOp<ActTrait> m_vel_op;
+
     //! Source computation operator
     ops::ActSrcOp<ActTrait, SrcTrait> m_src_op;
 
@@ -104,7 +116,10 @@ public:
      *  \param id Unique integer tag for this instance
      */
     ActModel(CFDSim& sim, const std::string& label, const int id)
-        : m_data(sim, label, id), m_src_op(m_data), m_out_op(m_data)
+        : m_data(sim, label, id)
+        , m_vel_op(m_data)
+        , m_src_op(m_data)
+        , m_out_op(m_data)
     {}
 
     //! Return the unique identifier (name) for this instance
@@ -136,13 +151,27 @@ public:
         ops::UpdatePosOp<ActTrait, SrcTrait>()(m_data);
         const auto& vpos = m_data.grid().vel_pos;
         std::copy(vpos.begin(), vpos.end(), pos.begin());
+        m_vel_op.setup_op();
     }
 
-    void update_fields(const VecSlice& vel, const RealSlice& density) override
+    void sample_weighted_vel(
+        const int lev,
+        const amrex::MFIter& mfi,
+        const amrex::Geometry& geom) override
     {
-        std::copy(vel.begin(), vel.end(), m_data.grid().vel.begin());
-        std::copy(
-            density.begin(), density.end(), m_data.grid().density.begin());
+        m_vel_op(lev, mfi, geom);
+    }
+
+    void update_fields(const VecSlice& vel, const RealSlice& density, bool update) override
+    {
+        m_vel_op.post();
+
+        if (update)
+        {
+            std::copy(vel.begin(), vel.end(), m_data.grid().vel.begin());
+            std::copy(
+                density.begin(), density.end(), m_data.grid().density.begin());
+        }
         ops::UpdateVelOp<ActTrait, SrcTrait>()(m_data);
     }
 
@@ -170,6 +199,7 @@ public:
     void init_actuator_source() override
     {
         ops::InitDataOp<ActTrait, SrcTrait>()(m_data);
+        m_vel_op.initialize();
         m_src_op.initialize();
     }
 };

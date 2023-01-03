@@ -42,6 +42,13 @@ struct InitDataOp;
 template <typename ActTrait, typename SrcTrait, typename = void>
 struct UpdatePosOp;
 
+/** Calculate weighted average velocities at the actuator nodes.
+ *
+ *  \ingroup actuator
+ */
+template <typename ActTrait>
+class VelAvgOp;
+
 /** Process updated velocities from CFD flow field.
  *
  *  \ingroup actuator

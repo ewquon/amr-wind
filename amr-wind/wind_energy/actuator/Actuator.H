@@ -60,6 +60,8 @@ private:
 
     void update_positions();
 
+    void sample_weighted_velocities(); // if m_weighted_sampling
+
     void update_velocities();
 
     void compute_forces();
@@ -73,6 +75,8 @@ private:
     std::vector<std::unique_ptr<ActuatorModel>> m_actuators;
 
     std::unique_ptr<ActuatorContainer> m_container;
+
+    bool m_weighted_sampling{false};
 };
 
 } // namespace actuator

@@ -24,6 +24,8 @@ void Actuator::pre_init_actions()
     amrex::Vector<std::string> labels;
     pp.getarr("labels", labels);
 
+    pp.query("weighted_sampling", m_weighted_sampling);
+
     const int nturbines = static_cast<int>(labels.size());
 
     for (int i = 0; i < nturbines; ++i) {
@@ -142,7 +144,7 @@ void Actuator::setup_container()
     for (int i = 0, il = 0; i < ntotal; ++i) {
         if (m_actuators[i]->info().sample_vel_in_proc) {
             pinfo.global_id[il] = i;
-            pinfo.num_pts[il] = m_actuators[i]->num_velocity_points();
+            pinfo.num_pts[il] = m_actuators[i]->num_velocity_points(); // == num_span_pts
             ++il;
         }
     }
@@ -169,12 +171,47 @@ void Actuator::update_positions()
         m_actuators[ig]->update_positions(vpos);
         ic += pinfo.num_pts[i];
     }
-    m_container->update_positions();
 
-    // Sample velocities at the new locations
-    const auto& vel = m_sim.repo().get_field("velocity");
-    const auto& density = m_sim.repo().get_field("density");
-    m_container->sample_fields(vel, density);
+    if (!m_weighted_sampling) // -- original policy w/ particles
+    {
+        m_container->update_positions();
+
+        // Sample velocities at the new locations
+        const auto& vel = m_sim.repo().get_field("velocity");
+        const auto& density = m_sim.repo().get_field("density");
+        m_container->sample_fields(vel, density);
+    }
+    else
+    {
+        sample_weighted_velocities();
+    }
+}
+
+/** Helper method to calculate the average velocities at actuator grid
+ *  points weighted by the body-force projection function
+ */
+void Actuator::sample_weighted_velocities()
+{
+    BL_PROFILE("amr-wind::actuator::Actuator::sample_weighted_velocities");
+    const int nlevels = m_sim.repo().num_active_levels();
+    const auto& vfield = m_sim.repo().get_field("velocity");
+
+    //for (int lev = 0; lev < nlevels; ++lev) {
+    // assume the finest level captures most of the projection function
+    int lev = nlevels - 1;
+    {
+        const auto& geom = m_sim.mesh().Geom(lev);
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+        for (amrex::MFIter mfi(vfield(lev)); mfi.isValid(); ++mfi) {
+            for (auto& ac : m_actuators) {
+                //if (ac->info().sample_vel_in_proc)
+                ac->sample_weighted_vel(lev, mfi, geom);
+            }
+        }
+    }
 }
 
 /** Provide updated velocities from container to actuator instances
@@ -194,7 +231,14 @@ void Actuator::update_velocities()
         const auto density =
             ::amr_wind::utils::slice(pinfo.density, ic, pinfo.num_pts[i]);
 
-        m_actuators[ig]->update_fields(vel, density);
+        if (m_weighted_sampling) {
+            // This will just call ops::UpdateVelOp
+            m_actuators[ig]->update_fields(vel, density, false);
+        } else {
+            // This will copy the particle velocities to the actuator grid
+            // prior to calling ops::UpdateVelOp
+            m_actuators[ig]->update_fields(vel, density, true);
+        }
         ic += pinfo.num_pts[i];
     }
 }
