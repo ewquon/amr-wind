@@ -232,12 +232,10 @@ struct ComputeForceOp<
             wvel.y() = 0.0;
 
             // Compute force on fluid to achieve no penetration
-            // assuming unit density
+            // assuming unit density: f ~ dv/dt
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
-            wvel_normal.y() = 0.0; // don't need this
-            auto force_local = wdata.gain * -wvel_normal / dt;
-            grid.force[ip] = force_local & tmat; // local --> inertial frame
+            grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
 
             if (DEBUG) {
                 // Determine unit vector parallel and perpendicular to velocity vector
