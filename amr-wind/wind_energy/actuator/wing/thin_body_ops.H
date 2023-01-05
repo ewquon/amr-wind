@@ -232,26 +232,22 @@ struct ComputeForceOp<
             // Set spanwise component to zero to get a pure 2D velocity
             wvel.y() = 0.0;
 
+            if (DEBUG && data.info().is_root_proc)
+                amrex::Print(amrex::Print::AllProcs)
+                    << "[ComputeForceOp] actuator " << data.info().id
+                    << " vel pt " << ip << " at "
+                    << grid.pos[ip].x() << " "
+                    << grid.pos[ip].y() << " "
+                    << grid.pos[ip].z() << " : "
+                    << wvel.x() << " "
+                    << wvel.y() << " "
+                    << wvel.z() << std::endl;
+
             // Compute force on fluid to achieve no penetration
             // assuming unit density: f ~ dv/dt
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
             grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
-
-            if (DEBUG) {
-                // Determine unit vector parallel and perpendicular to velocity vector
-                const auto drag_dir = wvel.unit() & tmat;
-                const auto lift_dir = drag_dir ^ tmat.y();
-
-                amrex::Print(amrex::Print::AllProcs) << "act pt " << ip << ":"
-                    << " grid.ori=" << grid.orientation[ip]
-                    << " grid.vel=" << grid.vel[ip]
-                    //<< " lift_dir=" << lift_dir
-                    //<< " drag_dir=" << drag_dir
-                    << " wvel=" << wvel
-                    << " force=" << grid.force[ip]
-                    << std::endl;
-            }
 
             // Compute 2-D lift, drag assuming unit density
             amrex::Real cl, cd;

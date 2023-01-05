@@ -183,6 +183,7 @@ void Actuator::update_positions()
     }
     else
     {
+//        amrex::Print() << "[Actuator::update_positions] Sampling weighted velocities" << std::endl;
         sample_weighted_velocities();
     }
 }
