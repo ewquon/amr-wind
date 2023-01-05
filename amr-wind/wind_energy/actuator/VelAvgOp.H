@@ -16,6 +16,8 @@ private:
     const Field& m_vfield;
   //const Field& m_rfield;
 
+    bool m_calc_diagnostics{true};
+
     DeviceVecList m_pos;
     DeviceVecList m_vel;
     DeviceVecList m_epsilon;
@@ -221,11 +223,13 @@ void VelAvgOp<ActTrait>::post()
 //                    << " (==" << m_data.info().root_proc << ")"
 //                    << " to receive from " << *procptr
 //                    << std::endl;
-                amrex::ParallelDescriptor::Recv(
-                    xfer_sum[idx].data(),
-                    size,
-                    iproc,
-                    tag_sum);
+                if (m_calc_diagnostics) {
+                    amrex::ParallelDescriptor::Recv(
+                        xfer_sum[idx].data(),
+                        size,
+                        iproc,
+                        tag_sum);
+                }
                 amrex::ParallelDescriptor::Recv(
                     xfer_vel[idx].data(),
                     size*3,
@@ -241,11 +245,13 @@ void VelAvgOp<ActTrait>::post()
 //                << " (==" << *procptr << ")"
 //                << " send to " << m_data.info().root_proc
 //                << std::endl;
-            amrex::ParallelDescriptor::Send(
-                m_host_sum.data(),
-                size,
-                m_data.info().root_proc,
-                tag_sum);
+            if (m_calc_diagnostics) {
+                amrex::ParallelDescriptor::Send(
+                    m_host_sum.data(),
+                    size,
+                    m_data.info().root_proc,
+                    tag_sum);
+            }
             amrex::ParallelDescriptor::Send(
                 packed_vel.data(),
                 size*3,
@@ -265,21 +271,24 @@ void VelAvgOp<ActTrait>::post()
             }
         }
 
-        // update diagnostic sum
-        amrex::Real sum_min{9e9}, sum_max{-9e9};
-        for (int ip = 0; ip < npts; ++ip) {
-            m_host_sum[ip] = 0.0;
-            for (int iproc = 0; iproc < nprocs; ++iproc) {
-                m_host_sum[ip] += xfer_sum[iproc][ip];
+        if (m_calc_diagnostics)
+        {
+            // update diagnostic sum
+            amrex::Real sum_min{9e9}, sum_max{-9e9};
+            for (int ip = 0; ip < npts; ++ip) {
+                m_host_sum[ip] = 0.0;
+                for (int iproc = 0; iproc < nprocs; ++iproc) {
+                    m_host_sum[ip] += xfer_sum[iproc][ip];
+                }
+                if (m_host_sum[ip] < sum_min) sum_min = m_host_sum[ip];
+                if (m_host_sum[ip] > sum_max) sum_max = m_host_sum[ip];
             }
-            if (m_host_sum[ip] < sum_min) sum_min = m_host_sum[ip];
-            if (m_host_sum[ip] > sum_max) sum_max = m_host_sum[ip];
-        }
 
-        amrex::Print(amrex::Print::AllProcs)
-            << "[VelAvgOp::post] actuator " << m_data.info().id
-            << " integrated weight min,max "
-            << sum_min << " " << sum_max << std::endl;
+            amrex::Print(amrex::Print::AllProcs)
+                << "[VelAvgOp::post] actuator " << m_data.info().id
+                << " integrated weight min,max "
+                << sum_min << " " << sum_max << std::endl;
+        }
     }
 
     // scatter averaged velocities
@@ -306,6 +315,8 @@ void VelAvgOp<ActTrait>::post()
             grid.vel[ip][idim] = packed_vel[i++];
         }
     }
+
+    m_calc_diagnostics = false;
 }
 
 } // namespace amr_wind::actuator::ops
