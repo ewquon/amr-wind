@@ -19,7 +19,7 @@ void read_inputs(
 
 /** Initialize core data structures when modeling fixed wings
  */
-void init_data_structures(WingBaseData& /*wdata*/, ActGrid& /*grid*/);
+void init_data_structures_no_edge(WingBaseData& /*wdata*/, ActGrid& /*grid*/);
 
 void prepare_netcdf_file(
     const std::string& /*ncfile*/,
@@ -51,6 +51,49 @@ ComponentView make_component_view(typename T::DataType& data)
     view.vel = ::amr_wind::utils::slice(grid.vel, 0, meta.num_pts);
 
     return view;
+}
+
+/** based on wing_ops.cpp
+    ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+  - actuator points do not extend to edge; rationale is that the body force
+    distribution should be able to represent a pressure jump over the thin 
+    body that vanishes at the edges, so the actuator forces at the end points
+    should tend to 0
+  - all actuator points have the same dx
+ */
+void init_data_structures_no_edge(WingBaseData& wdata, ActGrid& grid)
+{
+    int npts = wdata.num_pts;
+    grid.resize(npts);
+
+    // Wing span
+    auto wspan = wdata.end - wdata.start;
+    // Compute transformation matrix as a quaternion rotation about wing span
+    auto tmat = vs::quaternion(wspan, wdata.pitch);
+    // Epsilon (chord, thickness, span) -> (chord, span, thickness)
+    const auto& epsin = wdata.eps_inp;
+    vs::Vector eps{epsin.x(), epsin.z(), epsin.y()};
+
+    // Equal spacing along span
+    auto dx = (1.0 / static_cast<amrex::Real>(npts)) * wspan;
+
+    for (int i = 0; i < npts; ++i) {
+        grid.pos[i] = wdata.start + (static_cast<amrex::Real>(i)+0.5) * dx;
+    }
+
+    // Initialize remaining data
+    grid.epsilon.assign(npts, eps);
+    grid.orientation.assign(npts, tmat);
+    grid.force.assign(npts, vs::Vector::zero());
+    grid.vel_pos.assign(grid.pos.begin(), grid.pos.end());
+    grid.vel.assign(npts, vs::Vector::zero());
+
+    wdata.dx.assign(npts, vs::mag(dx));
+    wdata.vel_rel.assign(npts, vs::Vector::zero());
+    wdata.aoa.assign(npts, 0.0);
+    wdata.cl.assign(npts, 0.0);
+    wdata.cd.assign(npts, 0.0);
 }
 
 } // namespace wing
@@ -126,8 +169,9 @@ struct InitDataOp<ThinBody, ActSrcLine>
 {
     void operator()(ThinBody::DataType& data)
     {
-        // this sets up the actuator grid  
-        wing::init_data_structures(data.meta(), data.grid());
+        // this sets up the actuator grid
+      //wing::init_data_structures(data.meta(), data.grid());
+        wing::init_data_structures_no_edge(data.meta(), data.grid());
 
         auto& meta = data.meta();
         {
