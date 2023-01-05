@@ -172,7 +172,7 @@ void Actuator::update_positions()
         ic += pinfo.num_pts[i];
     }
 
-    if (!m_weighted_sampling) // -- original policy w/ particles
+    if (!m_weighted_sampling) // -- original approach w/ particles
     {
         m_container->update_positions();
 
@@ -208,7 +208,7 @@ void Actuator::sample_weighted_velocities()
         for (amrex::MFIter mfi(vfield(lev)); mfi.isValid(); ++mfi) {
             for (auto& ac : m_actuators) {
                 //if (ac->info().sample_vel_in_proc)
-                ac->sample_weighted_vel(lev, mfi, geom);
+                ac->integrate_weighted_velocities(lev, mfi, geom);
             }
         }
     }
@@ -221,6 +221,7 @@ void Actuator::sample_weighted_velocities()
 void Actuator::update_velocities()
 {
     BL_PROFILE("amr-wind::actuator::Actuator::update_velocities");
+
     auto& pinfo = m_container->m_data;
     for (int i = 0, ic = 0; i < pinfo.num_objects; ++i) {
         const auto ig = pinfo.global_id[i];

@@ -104,7 +104,8 @@ struct ReadInputsOp<ThinBody, ActSrcLine>
         amrex::Real max_epsc = *std::max_element(
             wdata.epsilon_chord.begin(), wdata.epsilon_chord.end());
         amrex::Real search_radius =
-            amrex::max(max_eps, max_epsc) * max_chord * 3.0;
+            amrex::max(max_eps, max_epsc) * max_chord * 50.0; //3.0; -- ad hoc value to produe identical result as serial run
+        //amrex::Print() << "search_radius = " << search_radius << std::endl;
         const auto& p1 = wdata.start;
         const auto& p2 = wdata.end;
         // clang-format off

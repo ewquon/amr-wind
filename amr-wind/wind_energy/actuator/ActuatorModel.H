@@ -57,7 +57,7 @@ public:
         const RealSlice&,
         bool update) = 0;
 
-    virtual void sample_weighted_vel(
+    virtual void integrate_weighted_velocities(
         const int lev,
         const amrex::MFIter& mfi,
         const amrex::Geometry& geom) = 0;
@@ -154,7 +154,7 @@ public:
         m_vel_op.setup_op();
     }
 
-    void sample_weighted_vel(
+    void integrate_weighted_velocities(
         const int lev,
         const amrex::MFIter& mfi,
         const amrex::Geometry& geom) override
