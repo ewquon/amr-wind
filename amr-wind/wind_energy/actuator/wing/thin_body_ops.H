@@ -19,6 +19,7 @@ void read_inputs(
 
 /** Initialize core data structures when modeling fixed wings
  */
+void init_data_structures(WingBaseData& /*wdata*/, ActGrid& /*grid*/);
 void init_data_structures_no_edge(WingBaseData& /*wdata*/, ActGrid& /*grid*/);
 
 void prepare_netcdf_file(
@@ -116,6 +117,7 @@ struct ReadInputsOp<ThinBody, ActSrcLine>
         auto& info = data.info();
         pp.get("num_span_points", wdata.num_pts);
         pp.get("num_chord_points", wdata.num_chord_pts);
+        pp.query("actuators_at_nodes", wdata.act_nodes);
         pp.get("start", wdata.start);
         pp.get("end", wdata.end);
         pp.query("gain", wdata.gain);
@@ -170,8 +172,12 @@ struct InitDataOp<ThinBody, ActSrcLine>
     void operator()(ThinBody::DataType& data)
     {
         // this sets up the actuator grid
-      //wing::init_data_structures(data.meta(), data.grid());
-        wing::init_data_structures_no_edge(data.meta(), data.grid());
+        if (data.meta().act_nodes) {
+            wing::init_data_structures(data.meta(), data.grid());
+        } else {
+            // no force pts on the edges of the actuator grid
+            wing::init_data_structures_no_edge(data.meta(), data.grid());
+        }
 
         auto& meta = data.meta();
         {

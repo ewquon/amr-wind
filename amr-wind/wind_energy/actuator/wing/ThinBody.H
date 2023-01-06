@@ -10,6 +10,7 @@ struct ThinBodyData : public WingBaseData
 {
     //int num_pts; // number of points along the span (defined in WingBaseData) 
     int num_chord_pts; // number of points along the chord (NOT IMPLEMENTED)
+    bool act_nodes{true}; // if false, force pts are at the center of each actuator segment
     RealList span_locs{0.0, 1.0};
     RealList chord_inp{1.0, 1.0};
 
