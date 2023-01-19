@@ -46,7 +46,7 @@ gaussian3d(const vs::Vector& dist, const vs::Vector& eps)
     const amrex::Real rr_sqr = vs::mag_sqr(rr);
 
     if (rr_sqr < 16.0) {
-        constexpr amrex::Real fac = 0.17958712212516656;
+        constexpr amrex::Real fac = 0.17958712212516656; // pi^(-3/2)
         const amrex::Real eps_fac = eps.x() * eps.y() * eps.z();
         return (fac / eps_fac) *
                std::exp(-rr.x() * rr.x() - rr.y() * rr.y() - rr.z() * rr.z());

@@ -14,7 +14,10 @@ struct ThinBodyData : public WingBaseData
     RealList span_locs{0.0, 1.0};
     RealList chord_inp{1.0, 1.0};
 
-    amrex::Real gain = 1.0;
+    amrex::Real gain = 1.0; // scale the point force (0 < gain <= 1, 1: no penetration)
+    bool limit_source_CFL{false}; // automatically scale the source term over time to keep source-term CFL below CFL_limit
+    amrex::Real CFL_limit = 1.0;
+    vs::Vector fmax_dtsq; // max point force * dt^2, a fixed value due to grid spacing and epsilon
 
     vs::Vector epsilon_chord;
 };

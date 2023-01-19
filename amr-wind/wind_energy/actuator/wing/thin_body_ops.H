@@ -106,6 +106,7 @@ namespace ops {
 
   - removed airfoil table lookup
   - add params `gain`, `num_chord_points` (not yet implemented)
+  - calculate max allowable point force to impose CFL limit
  */
 
 template <>
@@ -121,6 +122,8 @@ struct ReadInputsOp<ThinBody, ActSrcLine>
         pp.get("start", wdata.start);
         pp.get("end", wdata.end);
         pp.query("gain", wdata.gain);
+        pp.query("limit_source_CFL", wdata.limit_source_CFL);
+        pp.query("CFL_limit", wdata.CFL_limit);
         pp.query("epsilon", wdata.eps_inp);
         pp.query("epsilon_chord", wdata.epsilon_chord);
         pp.get("pitch", wdata.pitch);
@@ -204,6 +207,35 @@ struct InitDataOp<ThinBody, ActSrcLine>
                 }
             }
         }
+
+        if (meta.limit_source_CFL)
+        {
+            // source CFL = (src_term / (rho*dx))**0.5 * dt
+            //
+            // where:
+            // - gauss_fac ~ prod(eps_in) [m^-3]
+            // - F = aerodynamic force [N]
+            // - src_term = gauss_fac * F, a force per unit volume
+            // - rho is assumed to be 1 kg/m^3
+            //
+            // To get the maximum force corresponding to some CFL_limit,
+            //
+            //   Fmax * dt**2 = rho * dx * CFL_limit**2 / gauss_fac
+            //
+            // This quantity is scaled with the instantaneous dt**(-2).
+            //
+            const auto& mesh = data.sim().mesh();
+            const auto& dx = mesh.Geom(mesh.finestLevel()).CellSize();
+            const amrex::Real gauss_fac = utils::gaussian3d(vs::Vector::zero(), meta.eps_inp);
+            const amrex::Real rho = 1.0;
+            meta.fmax_dtsq.x() = rho * dx[0] * meta.CFL_limit * meta.CFL_limit / gauss_fac;
+            meta.fmax_dtsq.y() = rho * dx[1] * meta.CFL_limit * meta.CFL_limit / gauss_fac;
+            meta.fmax_dtsq.z() = rho * dx[2] * meta.CFL_limit * meta.CFL_limit / gauss_fac;
+            amrex::Print() << "Limiting source magnitude to CFL=" << meta.CFL_limit
+                << " based on finest mesh spacing ("
+                << dx[0] << " " << dx[1] << " " << dx[2]
+                << ")" << std::endl;
+        }
     }
 };
 
@@ -251,6 +283,12 @@ struct UpdateVelOp<
 
 /** specific to ThinBody actuator
     ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+
+    Actuator::post_init_actions, Actuator::pre_advance_work
+    --> Actuator::compute_forces
+        --> ActModel::compute_forces -- if data.info().actuator_in_proc
+            --> ops::ComputeForceOp()
+            --> ops::ActSrcOp.setup_op() -- copies newly computed forces to device
  */
 
 template <typename ActTrait>
@@ -271,11 +309,14 @@ struct ComputeForceOp<
 
         const bool DEBUG = false;
 
+        amrex::Real max_force_ratio = 0.0;
+
         amrex::Real dt = data.sim().time().deltaT();
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
-        for (int ip = 0; ip < npts; ++ip) {
+        for (int ip = 0; ip < npts; ++ip)
+        {
             const auto& tmat = grid.orientation[ip];
             // Effective velocity at the wing control point in local frame
             auto wvel = tmat & grid.vel[ip];
@@ -299,6 +340,21 @@ struct ComputeForceOp<
             wvel_normal.x() = 0.0;
             grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
 
+            if (wdata.limit_source_CFL)
+            {
+                auto fmax = wdata.fmax_dtsq / (dt*dt);
+                amrex::Real fx_ratio = std::abs(grid.force[ip][0]) / fmax.x();
+                amrex::Real fy_ratio = std::abs(grid.force[ip][1]) / fmax.y();
+                amrex::Real fz_ratio = std::abs(grid.force[ip][2]) / fmax.z();
+                amrex::Real comp_max = amrex::max(fx_ratio, fy_ratio, fz_ratio);
+//                amrex::Print(amrex::Print::AllProcs)
+//                    << "["<<amrex::ParallelDescriptor::MyProc()<<"] "
+//                    << "f_ratio (ip="<<ip<<") = "
+//                    << fx_ratio << " " << fy_ratio << " " << fz_ratio
+//                    << std::endl;
+                max_force_ratio = amrex::max(max_force_ratio, comp_max);
+            }
+
             // Compute 2-D lift, drag assuming unit density
             amrex::Real cl, cd;
             const auto vmag = vs::mag(wvel);
@@ -319,6 +375,27 @@ struct ComputeForceOp<
 
             total_lift += lift;
             total_drag += drag;
+        }
+
+        // Limit the force based on CFL constraint
+        if (wdata.limit_source_CFL)
+        {
+            // at this point, max_force_ratio is the maximum force ratio, considering
+            // all force components, out of all actuator points on this thin body
+            max_force_ratio = amrex::max(max_force_ratio, 1.0); // don't scale forces if max_force_ratio < 1
+            if (data.info().is_root_proc)
+                amrex::Print(amrex::Print::AllProcs)
+                    << "thin body " << data.info().id
+                    << " effective gain = " << wdata.gain / max_force_ratio
+                    << std::endl;
+
+            for (int ip = 0; ip < npts; ++ip) {
+                grid.force[ip] /= max_force_ratio;
+                wdata.cl[ip] /= max_force_ratio;
+                wdata.cd[ip] /= max_force_ratio;
+            }
+            total_lift /= max_force_ratio;
+            total_drag /= max_force_ratio;
         }
 
         wdata.lift = total_lift;
