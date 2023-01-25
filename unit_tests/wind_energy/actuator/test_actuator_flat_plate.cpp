@@ -165,6 +165,12 @@ struct ComputeForceOp<::amr_wind_tests::FlatPlate, SrcTrait>
     }
 };
 
+template <typename SrcTrait>
+struct ScaleForceOp<::amr_wind_tests::FlatPlate, SrcTrait>
+{
+    void operator()(::amr_wind_tests::FlatPlate::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
 } // namespace ops
 
 template class ::amr_wind::actuator::

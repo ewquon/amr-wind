@@ -67,6 +67,13 @@ struct UpdateVelOp;
 template <typename ActTrait, typename SrcTrait, typename = void>
 struct ComputeForceOp;
 
+/** Scale the forces at actuator grid points during a simulation.
+ *
+ *  \ingroup actuator
+ */
+template <typename ActTrait, typename SrcTrait, typename = void>
+struct ScaleForceOp;
+
 /** Compute source term for the momentum equation.
  *
  *  \ingroup actuator

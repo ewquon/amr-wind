@@ -282,6 +282,12 @@ struct ComputeForceOp<Joukowsky, ActSrcDisk>
 };
 
 template <>
+struct ScaleForceOp<Joukowsky, ActSrcDisk>
+{
+    void operator()(Joukowsky::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
+template <>
 struct ProcessOutputsOp<Joukowsky, ActSrcDisk>
 {
 private:

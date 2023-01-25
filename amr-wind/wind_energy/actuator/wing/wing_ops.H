@@ -170,6 +170,17 @@ struct ComputeForceOp<
     }
 };
 
+template <typename ActTrait>
+struct ScaleForceOp<
+    ActTrait,
+    ActSrcLine,
+    typename std::enable_if<
+        std::is_base_of<WingType, ActTrait>::value &&
+        UseDefaultOp<ActTrait, ActSrcLine>::compute_force>::type>
+{
+    void operator()(typename ActTrait::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
 template <typename ActTrait, typename SrcTrait>
 struct ProcessOutputsOp<
     ActTrait,

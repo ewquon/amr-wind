@@ -77,6 +77,9 @@ private:
     std::unique_ptr<ActuatorContainer> m_container;
 
     bool m_weighted_sampling{false};
+
+    bool m_limit_source_cfl{false};
+    amrex::Real m_cfl_limit{1.0};
 };
 
 } // namespace actuator

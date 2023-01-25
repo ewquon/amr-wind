@@ -159,6 +159,12 @@ struct ComputeForceOp<::amr_wind_tests::Joukowsky, ActSrcDisk>
 };
 
 template <>
+struct ScaleForceOp<::amr_wind_tests::Joukowsky, ActSrcDisk>
+{
+    void operator()(::amr_wind_tests::Joukowsky::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
+template <>
 struct ProcessOutputsOp<::amr_wind_tests::Joukowsky, ActSrcDisk>
 {
     ProcessOutputsOp<::amr_wind_tests::Joukowsky, ActSrcDisk>(

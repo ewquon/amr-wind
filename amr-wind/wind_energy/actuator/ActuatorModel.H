@@ -64,6 +64,8 @@ public:
 
     virtual void compute_forces() = 0;
 
+    virtual void scale_forces(amrex::Real gain) = 0;
+
     virtual void compute_source_term(
         const int lev,
         const amrex::MFIter& mfi,
@@ -179,6 +181,11 @@ public:
     {
         ops::ComputeForceOp<ActTrait, SrcTrait>()(m_data);
         m_src_op.setup_op();
+    }
+
+    void scale_forces(amrex::Real gain) override
+    {
+        ops::ScaleForceOp<ActTrait, SrcTrait>()(m_data, gain);
     }
 
     void compute_source_term(

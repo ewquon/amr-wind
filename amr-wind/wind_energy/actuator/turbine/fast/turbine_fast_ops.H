@@ -587,6 +587,12 @@ struct ComputeForceOp<TurbineFast, SrcTrait>
 };
 
 template <typename SrcTrait>
+struct ScaleForceOp<TurbineFast, SrcTrait>
+{
+    void operator()(typename TurbineFast::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
+template <typename SrcTrait>
 struct ProcessOutputsOp<TurbineFast, SrcTrait>
 {
 private:

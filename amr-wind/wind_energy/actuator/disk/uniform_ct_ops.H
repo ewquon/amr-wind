@@ -114,6 +114,12 @@ struct ComputeForceOp<UniformCt, ActSrcDisk>
 };
 
 template <>
+struct ScaleForceOp<UniformCt, ActSrcDisk>
+{
+    void operator()(UniformCt::DataType& /*data*/, amrex::Real /*gain*/) {}
+};
+
+template <>
 struct InitDataOp<UniformCt, ActSrcDisk>
 {
     void operator()(typename UniformCt::DataType& data)

@@ -26,6 +26,9 @@ void Actuator::pre_init_actions()
 
     pp.query("weighted_sampling", m_weighted_sampling);
 
+    pp.query("limit_source_CFL", m_limit_source_cfl);
+    pp.query("CFL_limit", m_cfl_limit);
+
     const int nturbines = static_cast<int>(labels.size());
 
     for (int i = 0; i < nturbines; ++i) {
@@ -275,6 +278,76 @@ void Actuator::compute_source_term()
                 if (ac->info().actuator_in_proc) {
                     ac->compute_source_term(lev, mfi, geom);
                 }
+            }
+        }
+    }
+
+    if (m_limit_source_cfl)
+    {
+        const int finest_level = m_sim.mesh().finestLevel();
+        auto& sfab_fine = m_act_source(finest_level);
+        auto const& src_arr = sfab_fine.const_arrays();
+        amrex::Real srcmax_lev = 0.0;
+        srcmax_lev += amrex::ParReduce(
+            amrex::TypeList<amrex::ReduceOpMax>{},
+            amrex::TypeList<amrex::Real>{},
+            sfab_fine,
+            amrex::IntVect(0),
+            [=] AMREX_GPU_HOST_DEVICE(
+                int box_no, int i, int j, int k) -> amrex::GpuTuple<amrex::Real> {
+                auto const& s_bx = src_arr[box_no];
+                return amrex::max<amrex::Real>(
+                    amrex::Math::abs(s_bx(i, j, k, 0)),
+                    amrex::Math::abs(s_bx(i, j, k, 1)),
+                    amrex::Math::abs(s_bx(i, j, k, 2)),
+                    static_cast<amrex::Real>(-1.0));
+            });
+        amrex::ParallelAllReduce::Max<amrex::Real>(
+                    srcmax_lev, amrex::ParallelContext::CommunicatorSub());
+        //amrex::Print(amrex::Print::AllProcs) << "max src val = " << srcmax_lev << std::endl;
+
+        // source CFL = (src_term / (rho*dx))**0.5 * dt
+        // max_source_mag = rho * dx * CFL_limit**2 / dt**2  [force/volume]
+        const auto& dx = m_sim.mesh().Geom(finest_level).CellSize();
+        const amrex::Real dt = m_sim.time().deltaT();
+        const amrex::Real rho = 1.0;
+        auto max_source_mag_x = rho * dx[0] * m_cfl_limit * m_cfl_limit / (dt*dt);
+        auto max_source_mag_y = rho * dx[1] * m_cfl_limit * m_cfl_limit / (dt*dt);
+        auto max_source_mag_z = rho * dx[2] * m_cfl_limit * m_cfl_limit / (dt*dt);
+        amrex::Real gain = amrex::min<amrex::Real>(
+            max_source_mag_x / srcmax_lev,
+            max_source_mag_y / srcmax_lev,
+            max_source_mag_z / srcmax_lev,
+            1.0 // don't scale forces if current srcmax_lev < max_source_mag
+        );
+        amrex::Print() << "max source magnitude = " << srcmax_lev << std::endl;
+        amrex::Print() << "max allowable source magnitude = "
+            << max_source_mag_x << " "
+            << max_source_mag_y << " "
+            << max_source_mag_z << std::endl;
+        amrex::Print() << "gain = " << gain << std::endl;
+
+        // scale source term field
+        for (int lev = 0; lev < nlevels; ++lev) {
+            auto& sfab = m_act_source(lev);
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(sfab); mfi.isValid(); ++mfi) {
+                const auto& bx = mfi.tilebox();
+                const auto& sarr = sfab.array(mfi);
+                amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+                    sarr(i, j, k, 0) *= gain;
+                    sarr(i, j, k, 1) *= gain;
+                    sarr(i, j, k, 2) *= gain;
+                });
+            }
+        }
+
+        // scale actuator forces (point forces, integrated lift/drag)
+        for (auto& ac : m_actuators) {
+            if (ac->info().actuator_in_proc) {
+                ac->scale_forces(gain);
             }
         }
     }
