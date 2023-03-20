@@ -35,6 +35,10 @@ ABLFieldInit::ABLFieldInit()
 
     pp_abl.query("linear_profile", m_linear_profile);
 
+    pp_abl.query("log_profile", m_log_profile);
+    pp_abl.query("log_z0", m_log_z0);
+    pp_abl.query("log_ustar", m_log_ustar);
+
     pp_abl.query("top_velocity", m_top_vel);
     pp_abl.query("bottom_velocity", m_bottom_vel);
 
@@ -83,6 +87,10 @@ void ABLFieldInit::operator()(
     const bool perturb_vel = m_perturb_vel;
 
     const bool linear_profile = m_linear_profile;
+
+    const bool log_profile = m_log_profile;
+    const amrex::Real log_z0 = m_log_z0;
+    const amrex::Real log_ustar = m_log_ustar;
 
     const amrex::Real rho_init = m_rho;
 
@@ -142,6 +150,12 @@ void ABLFieldInit::operator()(
             velocity(i, j, k, 2) =
                 bottom_w_vel +
                 z * (top_w_vel - bottom_w_vel) / (probhi[2] - problo[2]);
+        }
+
+        if (log_profile) {
+            velocity(i, j, k, 0) = log_ustar/0.41 * std::log((z-problo[2]) / log_z0);
+            velocity(i, j, k, 1) = 0.0;
+            velocity(i, j, k, 2) = 0.0;
         }
 
         if (perturb_vel) {

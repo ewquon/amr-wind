@@ -109,6 +109,11 @@ private:
     //! Initial linear velocity profile boolean
     bool m_linear_profile{false};
 
+    //! Initial neutral log wind profile boolean
+    bool m_log_profile{false};
+    amrex::Real m_log_z0{0.1};
+    amrex::Real m_log_ustar{0.5};
+
     //! Perturb initial velocity field with sinusoidal fluctuations
     bool m_perturb_vel{true};
 
