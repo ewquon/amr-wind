@@ -279,13 +279,11 @@ struct ComputeForceOp<
 
         const bool DEBUG = false;
 
-
         amrex::Real dt = data.sim().time().deltaT();
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
-        for (int ip = 0; ip < npts; ++ip)
-        {
+        for (int ip = 0; ip < npts; ++ip) {
             const auto& tmat = grid.orientation[ip];
             // Effective velocity at the wing control point in local frame
             auto wvel = tmat & grid.vel[ip];
@@ -346,6 +344,7 @@ struct ComputeForceOp<
             }
         }
     }
+};
 
 template <typename ActTrait>
 struct ScaleForceOp<
