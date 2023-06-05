@@ -113,7 +113,9 @@ struct ComputeForceOp<
         const int npts = wdata.num_pts;
         const auto& dx = wdata.dx;
         const auto& chord = wdata.chord;
-        const auto& aflookup = airfoil_lookup<ActTrait>(data);
+
+        bool force_override = false;
+        if (wdata.force_override_inp.size() > 0) force_override = true;
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
@@ -127,21 +129,37 @@ struct ComputeForceOp<
             const auto vmag = vs::mag(wvel);
             const auto aoa = std::atan2(wvel.z(), wvel.x());
 
-            // Make up some Cl, Cd values
-            amrex::Real cl, cd;
-            aflookup(aoa, cl, cd);
-
-            // Assume unit chord
-            const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = qval * cl;
-            const auto drag = qval * cd;
             // Determine unit vector parallel and perpendicular to velocity
             // vector
             const auto drag_dir = wvel.unit() & tmat;
             const auto lift_dir = drag_dir ^ tmat.y();
 
-            // Compute force on fluid from this section of wing
-            grid.force[ip] = -(lift_dir * lift + drag * drag_dir);
+            amrex::Real cl, cd;
+            amrex::Real lift, drag, qval;
+            if (force_override) {
+                lift = wdata.force_override_inp.z();
+                drag = wdata.force_override_inp.x();
+
+                // Assume unit density, span
+                qval = 0.5 * vmag * vmag * chord[ip]; // hack: remove dx[ip] to get rid of dx/2 at endpoints for 2D sim
+                cl = lift / qval;
+                cd = drag / qval;
+
+                // Compute force on fluid from this section of wing
+                grid.force[ip] = -wdata.force_override_inp;
+
+            } else {
+                const auto& aflookup = airfoil_lookup<ActTrait>(data);
+                aflookup(aoa, cl, cd);
+
+                // Assume unit density
+                qval = 0.5 * vmag * vmag * chord[ip] * dx[ip]; // note: dx is spanwise segment length
+                lift = qval * cl;
+                drag = qval * cd;
+
+                // Compute force on fluid from this section of wing
+                grid.force[ip] = -(lift_dir * lift + drag * drag_dir);
+            }
 
             // Assign values for output
             wdata.vel_rel[ip] = wvel;
