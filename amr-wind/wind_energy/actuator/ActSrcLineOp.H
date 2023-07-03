@@ -94,17 +94,20 @@ void ActSrcOp<ActTrait, ActSrcLine>::operator()(
         for (int ip = 0; ip < npts; ++ip) {
             const auto dist = cc - pos[ip];
             const auto dist_local = tmat[ip] & dist;
-            const auto gauss_fac = utils::gaussian3d(dist_local, eps[ip]);
+            //const auto gauss_fac = utils::gaussian3d(dist_local, eps[ip]);
+            const auto gauss_fac = utils::gaussian2d(dist_local, eps[ip]);
             const auto& pforce = force[ip];
+
+            if (std::abs(dist_local.z()) > 1e-8) continue;
 
             src_force[0] += gauss_fac * pforce.x();
             src_force[1] += gauss_fac * pforce.y();
-            src_force[2] += gauss_fac * pforce.z();
+            //src_force[2] += gauss_fac * pforce.z();
         }
 
         sarr(i, j, k, 0) += src_force[0];
         sarr(i, j, k, 1) += src_force[1];
-        sarr(i, j, k, 2) += src_force[2];
+        //sarr(i, j, k, 2) += src_force[2];
     });
 }
 } // namespace amr_wind::actuator::ops

@@ -137,7 +137,7 @@ struct ComputeForceOp<
             amrex::Real cl, cd;
             amrex::Real lift, drag, qval;
             if (force_override) {
-                lift = wdata.force_override_inp.z();
+                lift = wdata.force_override_inp.y();
                 drag = wdata.force_override_inp.x();
 
                 // Assume unit density, span
