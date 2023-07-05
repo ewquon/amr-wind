@@ -117,6 +117,9 @@ struct ComputeForceOp<
         bool force_override = false;
         if (wdata.force_override_inp.size() > 0) force_override = true;
 
+        const auto& aflookup = airfoil_lookup<ActTrait>(data);
+        const auto& time = data.sim().time();
+
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
         for (int ip = 0; ip < npts; ++ip) {
@@ -175,7 +178,8 @@ struct ComputeForceOp<
         wdata.drag = total_drag;
 
         if (wdata.fllc) {
-            if (!(wdata.fllc->initialized)) {
+            if (!(wdata.fllc->initialized) &&
+                (time.current_time() > wdata.fllc->fllc_start_time)) {
                 wdata.component_view =
                     amr_wind::actuator::wing::make_component_view<ActTrait>(
                         data);
