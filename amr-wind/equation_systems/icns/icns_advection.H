@@ -11,6 +11,8 @@
 #include "hydro_mol.H"
 #include "hydro_utils.H"
 
+#include "amr-wind/utilities/diagnostics.H"
+
 namespace amr_wind::pde {
 
 class MacProjOp
@@ -119,9 +121,13 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         // 1 = conservative (default), 0 = nonconservative
         pp.query("icns_conserv", m_cons);
         iconserv.resize(ICNS::ndim, m_cons);
+
+        // Get copy of verbose
+        pp.query("verbose", m_verbose);
     }
 
-    void preadvect(const FieldState fstate, const amrex::Real dt)
+    void preadvect(
+        const FieldState fstate, const amrex::Real dt, const amrex::Real time)
     {
 
         const auto& repo = fields.repo;
@@ -281,6 +287,10 @@ struct AdvectionOp<ICNS, fvm::Godunov>
             }
         }
 
+        if (m_verbose > 2) {
+            diagnostics::PrintMaxMACVelLocations(repo, "before MAC projection");
+        }
+
         // MAC projection
         m_macproj_op(fstate, dt);
 
@@ -288,13 +298,17 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         if (fvm::Godunov::nghost_state > 0) {
             amrex::Array<Field*, AMREX_SPACEDIM> mac_vel = {
                 AMREX_D_DECL(&u_mac, &v_mac, &w_mac)};
-            dof_field.fillpatch_sibling_fields(0.0, u_mac.num_grow(), mac_vel);
+            dof_field.fillpatch_sibling_fields(time, u_mac.num_grow(), mac_vel);
         }
 
         for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
             u_mac(lev).FillBoundary(geom[lev].periodicity());
             v_mac(lev).FillBoundary(geom[lev].periodicity());
             w_mac(lev).FillBoundary(geom[lev].periodicity());
+        }
+
+        if (m_verbose > 2) {
+            diagnostics::PrintMaxMACVelLocations(repo, "after MAC projection");
         }
     }
 
@@ -505,6 +519,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
     const bool fluxes_are_area_weighted{false};
     bool godunov_use_forces_in_trans{false};
     int m_cons{1};
+    int m_verbose{0};
     std::string premac_advection_type{"Godunov"};
     std::string postmac_advection_type{"Godunov"};
 };
@@ -529,7 +544,10 @@ struct AdvectionOp<ICNS, fvm::MOL>
               fields.repo, has_overset, variable_density, m_mesh_mapping)
     {}
 
-    void preadvect(const FieldState fstate, const amrex::Real dt)
+    void preadvect(
+        const FieldState fstate,
+        const amrex::Real dt,
+        const amrex::Real /*time*/)
     {
 
         // cppcheck-suppress constVariable

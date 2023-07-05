@@ -111,7 +111,9 @@ void ABLModulatedPowerLaw::set_velocity(
     const int lev,
     const amrex::Real /*time*/,
     const Field& fld,
-    amrex::MultiFab& mfab) const
+    amrex::MultiFab& mfab,
+    const int dcomp,
+    const int orig_comp) const
 {
 
     if (!m_activate_mpl) {
@@ -171,13 +173,17 @@ void ABLModulatedPowerLaw::set_velocity(
                                       : amrex::adjCellHi(domain, idir, nghost);
 
         for (amrex::MFIter mfi(mfab); mfi.isValid(); ++mfi) {
-            const auto& gbx = amrex::grow(mfi.validbox(), nghost);
+            auto gbx = amrex::grow(mfi.validbox(), nghost);
+            if (!gbx.cellCentered()) {
+                gbx.enclosedCells();
+            }
             const auto& bx = gbx & dbx;
             if (!bx.ok()) {
                 continue;
             }
 
             const auto& arr = mfab[mfi].array();
+            const int numcomp = mfab.nComp();
 
             amrex::ParallelFor(
                 bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
@@ -191,9 +197,13 @@ void ABLModulatedPowerLaw::set_velocity(
                         0.5 * upper_coeff *
                         (tanh(smear_coeff * (zeff - zc)) + 1.0) / uref;
 
-                    arr(i, j, k, 0) = tvx * (pfac + tanhterm);
-                    arr(i, j, k, 1) = tvy * (pfac + tanhterm);
-                    arr(i, j, k, 2) = tvz;
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> vels = {
+                        AMREX_D_DECL(
+                            tvx * (pfac + tanhterm), tvy * (pfac + tanhterm),
+                            tvz)};
+                    for (int n = 0; n < numcomp; n++) {
+                        arr(i, j, k, dcomp + n) = vels[orig_comp + n];
+                    }
                 });
         }
     }
@@ -240,7 +250,10 @@ void ABLModulatedPowerLaw::set_temperature(
                                       : amrex::adjCellHi(domain, idir, nghost);
 
         for (amrex::MFIter mfi(mfab); mfi.isValid(); ++mfi) {
-            const auto& gbx = amrex::grow(mfi.validbox(), nghost);
+            auto gbx = amrex::grow(mfi.validbox(), nghost);
+            if (!gbx.cellCentered()) {
+                gbx.enclosedCells();
+            }
             const auto& bx = gbx & dbx;
             if (!bx.ok()) {
                 continue;
