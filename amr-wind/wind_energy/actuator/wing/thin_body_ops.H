@@ -211,6 +211,10 @@ struct InitDataOp<ThinBody, ActSrcLine>
 
         // Create field to use in CV analysis adjacent to the actuator surface
         data.sim().repo().declare_field("mom_flux_sum");
+        // declare_int_field(name,ncomp,ngrow,nstates,floc)
+        data.sim().repo().declare_int_field("mom_xface_mask",1,0,1,amr_wind::FieldLoc::XFACE);
+        data.sim().repo().declare_int_field("mom_yface_mask",1,0,1,amr_wind::FieldLoc::YFACE);
+        data.sim().repo().declare_int_field("mom_zface_mask",1,0,1,amr_wind::FieldLoc::ZFACE);
     }
 };
 

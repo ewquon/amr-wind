@@ -2,6 +2,7 @@
 #define ACTUATORCONTAINER_H
 
 #include "amr-wind/core/vs/vector_space.H"
+#include "amr-wind/core/IntField.H"
 
 #include "AMReX_AmrParticles.H"
 
@@ -90,6 +91,9 @@ public:
     void populate_field_buffers();
 
     void initialize_particles(const int total_pts);
+
+    // for ThinBody actuator
+    void mark_surface_faces(IntField& xface, IntField& yface, IntField& zface);
 
 protected:
     void compute_local_coordinates();

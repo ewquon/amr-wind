@@ -186,6 +186,14 @@ void Actuator::update_positions()
     {
         m_container->update_positions();
 
+        // Mark ThinBody actuator surface faces
+        if (m_sim.repo().field_exists("mom_flux_sum")) {
+            auto& xface = m_sim.repo().get_int_field("mom_xface_mask");
+            auto& yface = m_sim.repo().get_int_field("mom_yface_mask");
+            auto& zface = m_sim.repo().get_int_field("mom_zface_mask");
+            m_container->mark_surface_faces(xface,yface,zface);
+        }
+
         // Sample velocities at the new locations
         const auto& vel = m_sim.repo().get_field("velocity");
         const auto& density = m_sim.repo().get_field("density");
@@ -193,7 +201,7 @@ void Actuator::update_positions()
     }
     else
     {
-//        amrex::Print() << "[Actuator::update_positions] Sampling weighted velocities" << std::endl;
+        amrex::Print() << "[Actuator::update_positions] Sampling weighted velocities (DEPRECATED)" << std::endl;
         sample_weighted_velocities();
     }
 }

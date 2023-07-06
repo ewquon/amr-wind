@@ -324,6 +324,13 @@ void ActuatorContainer::interpolate_fields(
 
                 const int iproc = pp.cpu();
 
+                //amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                //    << " particle " << pp.idata(0)
+                //    << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                //    << " --> ("<<x<<","<<y<<","<<z<<")"
+                //    << " at ("<<i<<","<<j<<","<<k<<")"
+                //    << std::endl;
+
                 // velocity
                 for (int ic = 0; ic < AMREX_SPACEDIM; ++ic) {
                     pp.rdata(ic) =
@@ -351,6 +358,97 @@ void ActuatorContainer::interpolate_fields(
                     wx_hi * wy_lo * wz_hi * darr(i + 1, j, k + 1) +
                     wx_hi * wy_hi * wz_lo * darr(i + 1, j + 1, k) +
                     wx_hi * wy_hi * wz_hi * darr(i + 1, j + 1, k + 1);
+            });
+        }
+    }
+}
+
+/** Identify and mark actuator surface faces
+ *
+ *  Used by the ThinBody actuator. Based on interpolate_fields().
+ */
+void ActuatorContainer::mark_surface_faces(
+    IntField& xface, IntField& yface, IntField& zface)
+{
+    BL_PROFILE("amr-wind::actuator::ActuatorContainer::mark_surface_faces");
+    AMREX_ALWAYS_ASSERT(m_container_initialized && m_is_scattered);
+
+    const bool DEBUG = false;
+
+    xface.setVal(1);
+    yface.setVal(1);
+    zface.setVal(1);
+
+    const int nlevels = m_mesh.finestLevel() + 1;
+    for (int lev = 0; lev < nlevels; ++lev) {
+        const auto& geom = m_mesh.Geom(lev);
+        const auto dxi = geom.InvCellSizeArray();
+        const auto plo = geom.ProbLoArray();
+
+        for (ParIterType pti(*this, lev); pti.isValid(); ++pti) {
+            const int np = pti.numParticles();
+            auto* pstruct = pti.GetArrayOfStructs()().data();
+            const auto xf_arr = xface(lev).array(pti);
+            const auto yf_arr = yface(lev).array(pti);
+            const auto zf_arr = zface(lev).array(pti);
+
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(const int ip) noexcept {
+                auto& pp = pstruct[ip];
+                // Determine offsets _from the nearest node_
+                const amrex::Real x =
+                    (pp.pos(0) - plo[0]) * dxi[0];
+                const amrex::Real y =
+                    (pp.pos(1) - plo[1]) * dxi[1];
+                const amrex::Real z =
+                    (pp.pos(2) - plo[2]) * dxi[2];
+
+                // Index of the low corner
+                constexpr amrex::Real domain_eps = 1.0e-6;
+                const int i = static_cast<int>(std::floor(x + domain_eps));
+                const int j = static_cast<int>(std::floor(y + domain_eps));
+                const int k = static_cast<int>(std::floor(z + domain_eps));
+
+                const int iproc = pp.cpu();
+
+                //amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                //    << " mark particle " << pp.idata(0)
+                //    << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                //    << " --> ("<<x<<","<<y<<","<<z<<")"
+                //    << " at ("<<i<<","<<j<<","<<k<<")"
+                //    << std::endl;
+
+                // x,y,z will be integers if the requested position is
+                // staggered, unlike interpolate_fields
+                if (x==i) {
+                    xf_arr(i,j,k) = 0;
+                    if (DEBUG)
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " --> ("<<x<<","<<y<<","<<z<<")"
+                            << " mark xface at ("<<i<<","<<j<<","<<k<<")"
+                            << std::endl;
+                }
+                if (y==j) {
+                    yf_arr(i,j,k) = 0;
+                    if (DEBUG)
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " --> ("<<x<<","<<y<<","<<z<<")"
+                            << " mark yface at ("<<i<<","<<j<<","<<k<<")"
+                            << std::endl;
+                }
+                if (z==k) {
+                    zf_arr(i,j,k) = 0;
+                    if (DEBUG)
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " --> ("<<x<<","<<y<<","<<z<<")"
+                            << " mark zface at ("<<i<<","<<j<<","<<k<<")"
+                            << std::endl;
+                }
             });
         }
     }
