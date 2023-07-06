@@ -38,9 +38,12 @@ struct ReadInputsOp<FixedWing, ActSrcLine>
         pp.get("end", wdata.end);
         pp.query("epsilon", wdata.eps_inp);
         pp.query("epsilon_chord", wdata.epsilon_chord);
-        pp.get("pitch", wdata.pitch);
-        pp.get("airfoil_table", wdata.airfoil_file);
-        pp.query("airfoil_type", wdata.airfoil_type);
+        pp.query("pitch", wdata.pitch);
+        pp.query("force_override", wdata.force_override_inp);
+        if (wdata.force_override_inp.size() == 0) {
+            pp.get("airfoil_table", wdata.airfoil_file);
+            pp.query("airfoil_type", wdata.airfoil_type);
+        }
         pp.queryarr("span_locs", wdata.span_locs);
         pp.queryarr("chord", wdata.chord_inp);
         bool use_fllc = false;
@@ -116,8 +119,9 @@ struct InitDataOp<FixedWing, ActSrcLine>
             }
         }
 
-        meta.aflookup =
-            AirfoilLoader::load_airfoil(meta.airfoil_file, meta.airfoil_type);
+        if (meta.force_override_inp.size() == 0)
+            meta.aflookup =
+                AirfoilLoader::load_airfoil(meta.airfoil_file, meta.airfoil_type);
     }
 };
 

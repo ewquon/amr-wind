@@ -28,6 +28,9 @@ struct WingBaseData
     //! Gaussian smearing factor input by user
     vs::Vector eps_inp;
 
+    //! Bypass aero table lookup
+    vs::Vector force_override_inp;
+
     //! epsilon / chord
     vs::Vector epsilon_chord;
 
