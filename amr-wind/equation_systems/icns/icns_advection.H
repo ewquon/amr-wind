@@ -6,6 +6,8 @@
 #include "amr-wind/equation_systems/icns/icns.H"
 #include "amr-wind/equation_systems/vof/vof_momentum_flux.H"
 
+#include "amr-wind/thin_body/thinbody_CV_analysis.H"
+
 #include "AMReX_MultiFabUtil.H"
 #include "hydro_MacProjector.H"
 #include "hydro_mol.H"
@@ -339,6 +341,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
             repo.get_field("density").state(amr_wind::FieldState::Old);
 
         const bool mphase_vof = repo.field_exists("vof");
+        const bool thinbody_actuator = repo.field_exists("mom_flux_sum");
 
         //
         // Advect momentum eqns
@@ -499,6 +502,14 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         (*face_z)(lev).const_array(mfi), divum_arr,
                         conv_term(lev).array(mfi), iconserv.data(),
                         postmac_advection_type);
+                }
+
+                if (thinbody_actuator) {
+                    thinbody::sum_momentum_fluxes(
+                        repo, lev, bx, mfi,
+                        (*flux_x)(lev).const_array(mfi),
+                        (*flux_y)(lev).const_array(mfi),
+                        (*flux_z)(lev).const_array(mfi));
                 }
             }
         }

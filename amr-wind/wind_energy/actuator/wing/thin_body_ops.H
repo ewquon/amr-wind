@@ -209,6 +209,8 @@ struct InitDataOp<ThinBody, ActSrcLine>
             }
         }
 
+        // Create field to use in CV analysis adjacent to the actuator surface
+        data.sim().repo().declare_field("mom_flux_sum");
     }
 };
 
