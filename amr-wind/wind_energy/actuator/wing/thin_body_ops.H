@@ -174,9 +174,12 @@ struct InitDataOp<ThinBody, ActSrcLine>
     {
         // this sets up the actuator grid
         if (data.meta().act_nodes) {
+            // force points extend to edge of actuator grid; first and
+            // last points have half the segment width (actuator line
+            // model default)
             wing::init_data_structures(data.meta(), data.grid());
         } else {
-            // no force pts on the edges of the actuator grid
+            // force pts are at the center of each actuator segment
             wing::init_data_structures_no_edge(data.meta(), data.grid());
         }
 
