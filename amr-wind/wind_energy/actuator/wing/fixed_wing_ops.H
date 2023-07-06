@@ -56,6 +56,8 @@ struct ReadInputsOp<FixedWing, ActSrcLine>
                 "of 'epsilon' or 'epsilon_chord'");
         }
 
+        pp.query("twoD", wdata.is_2D);
+
         AMREX_ALWAYS_ASSERT(wdata.span_locs.size() == wdata.chord_inp.size());
 
         amrex::Real max_chord =

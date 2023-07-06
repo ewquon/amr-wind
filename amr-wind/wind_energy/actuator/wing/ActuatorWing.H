@@ -63,6 +63,9 @@ struct WingBaseData
 
     //! Total integrated drag over the wing
     amrex::Real drag{0.0};
+
+    //! Use 2-D force projection -- for testing only
+    bool is_2D = false;
 };
 
 struct WingType : public ActuatorType
