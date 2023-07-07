@@ -15,7 +15,7 @@ static void sum_momentum_fluxes(
     const amrex::Array4<const amrex::Real>& flux_z_arr,
     const amrex::Array4<const amrex::Real>& gp_arr)
 {
-    auto& flux_sum = repo.get_field("mom_flux_sum");
+    auto& flux_sum = repo.get_field("mom_sum");
     auto& xface_mask = repo.get_int_field("mom_xface_mask");
     auto& yface_mask = repo.get_int_field("mom_yface_mask");
     auto& zface_mask = repo.get_int_field("mom_zface_mask");

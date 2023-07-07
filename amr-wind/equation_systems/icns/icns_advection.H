@@ -341,7 +341,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
             repo.get_field("density").state(amr_wind::FieldState::Old);
 
         const bool mphase_vof = repo.field_exists("vof");
-        const bool thinbody_actuator = repo.field_exists("mom_flux_sum");
+        const bool thinbody_actuator = repo.field_exists("mom_sum");
 
         //
         // Advect momentum eqns
