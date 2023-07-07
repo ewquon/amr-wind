@@ -505,11 +505,14 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 }
 
                 if (thinbody_actuator) {
+                    const auto& grad_p = repo.get_field("gp");
                     thinbody::sum_momentum_fluxes(
-                        repo, lev, mfi, bx,
+                        repo, ICNS::ndim,
+                        lev, mfi, bx, geom[lev],
                         (*flux_x)(lev).const_array(mfi),
                         (*flux_y)(lev).const_array(mfi),
-                        (*flux_z)(lev).const_array(mfi));
+                        (*flux_z)(lev).const_array(mfi),
+                        grad_p(lev).const_array(mfi));
                 }
             }
         }
