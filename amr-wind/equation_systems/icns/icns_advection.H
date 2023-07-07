@@ -506,7 +506,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
 
                 if (thinbody_actuator) {
                     thinbody::sum_momentum_fluxes(
-                        repo, lev, bx, mfi,
+                        repo, lev, mfi, bx,
                         (*flux_x)(lev).const_array(mfi),
                         (*flux_y)(lev).const_array(mfi),
                         (*flux_z)(lev).const_array(mfi));
