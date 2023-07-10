@@ -472,17 +472,22 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 geom[lev - 1]);
         }
 
-        for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
+        // Thin Body Actuator estimates the surface actuator force based on a
+        // local control-volume analysis above/below a zero-thickness body. We
+        // use the same advective fluxes for the CV analysis as the solution
+        // advance.
+        if (thinbody_actuator) {
+            const auto& grad_p = repo.get_field("gp"); // cell-centered
 
-#ifdef AMREX_USE_OMP
-#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
-#endif
-            for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
-                 mfi.isValid(); ++mfi) {
-                const auto& bx = mfi.tilebox();
+            for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
+                amrex::AllPrint()
+                    << "[iproc="<<amrex::ParallelDescriptor::MyProc()<<"]"
+                    << " Summing fluxes (lev="<<lev<<")" << std::endl;
 
-                if (thinbody_actuator) {
-                    const auto& grad_p = repo.get_field("gp");
+                for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
+                     mfi.isValid(); ++mfi) {
+                    const auto& bx = mfi.tilebox();
+
                     thinbody::sum_momentum_fluxes(
                         repo, ICNS::ndim,
                         lev, mfi, bx, geom[lev],
@@ -491,6 +496,17 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         (*flux_z)(lev).const_array(mfi),
                         grad_p(lev).const_array(mfi));
                 }
+            }
+        }
+
+        for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
+
+#ifdef AMREX_USE_OMP
+#pragma omp parallel if (amrex::Gpu::notInLaunchRegion())
+#endif
+            for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
+                 mfi.isValid(); ++mfi) {
+                const auto& bx = mfi.tilebox();
 
                 HydroUtils::ComputeDivergence(
                     bx, conv_term(lev).array(mfi), (*flux_x)(lev).array(mfi),
