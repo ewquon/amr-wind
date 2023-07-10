@@ -24,6 +24,8 @@ void Actuator::pre_init_actions()
     amrex::Vector<std::string> labels;
     pp.getarr("labels", labels);
 
+    pp.query("update_actuator_faces_every_step", m_update_actuator_faces);
+
     pp.query("weighted_sampling", m_weighted_sampling);
 
     pp.query("limit_source_CFL", m_limit_source_cfl);
@@ -186,12 +188,17 @@ void Actuator::update_positions()
     {
         m_container->update_positions();
 
-        // Mark ThinBody actuator surface faces
-        if (m_sim.repo().field_exists("mom_flux_sum")) {
-            auto& xface = m_sim.repo().get_int_field("mom_xface_mask");
-            auto& yface = m_sim.repo().get_int_field("mom_yface_mask");
-            auto& zface = m_sim.repo().get_int_field("mom_zface_mask");
-            m_container->mark_surface_faces(xface,yface,zface);
+        if (m_sim.repo().field_exists("mom_sum")) {
+            // Mark ThinBody actuator surface faces -- affects mom_sum
+            // calculated during the upcoming solution advance
+            if (m_need_mark_faces) {
+                auto& xface = m_sim.repo().get_int_field("mom_xface_mask");
+                auto& yface = m_sim.repo().get_int_field("mom_yface_mask");
+                auto& zface = m_sim.repo().get_int_field("mom_zface_mask");
+                m_container->mark_surface_faces(xface,yface,zface);
+                if (!m_update_actuator_faces)
+                    m_need_mark_faces = false;
+            }
 
             // Get the mom_sum calculated during the previous solution advance
             const auto& mom_sum = m_sim.repo().get_field("mom_sum");

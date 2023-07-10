@@ -78,8 +78,19 @@ private:
 
     std::unique_ptr<ActuatorContainer> m_container;
 
-    bool m_weighted_sampling{false};
+    //
+    // ThinBody actuator options
+    //
+    //-control calls to ActuatorContainer object
+    bool m_need_mark_faces{true};
+    bool m_update_actuator_faces{false}; // at every step
 
+    //-if true, use weighted volume sampling rather than interpolating
+    // to a point with particles
+    bool m_weighted_sampling{false}; // deprecated
+
+    //-limit max source term magnitude -- for testing only, does _not_
+    // account for pressure gradient contribution to RHS source
     bool m_limit_source_cfl{false};
     amrex::Real m_cfl_limit{1.0};
 };
