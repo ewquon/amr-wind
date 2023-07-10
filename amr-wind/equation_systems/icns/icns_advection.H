@@ -481,6 +481,17 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                  mfi.isValid(); ++mfi) {
                 const auto& bx = mfi.tilebox();
 
+                if (thinbody_actuator) {
+                    const auto& grad_p = repo.get_field("gp");
+                    thinbody::sum_momentum_fluxes(
+                        repo, ICNS::ndim,
+                        lev, mfi, bx, geom[lev],
+                        (*flux_x)(lev).const_array(mfi),
+                        (*flux_y)(lev).const_array(mfi),
+                        (*flux_z)(lev).const_array(mfi),
+                        grad_p(lev).const_array(mfi));
+                }
+
                 HydroUtils::ComputeDivergence(
                     bx, conv_term(lev).array(mfi), (*flux_x)(lev).array(mfi),
                     (*flux_y)(lev).array(mfi), (*flux_z)(lev).array(mfi),
@@ -502,17 +513,6 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         (*face_z)(lev).const_array(mfi), divum_arr,
                         conv_term(lev).array(mfi), iconserv.data(),
                         postmac_advection_type);
-                }
-
-                if (thinbody_actuator) {
-                    const auto& grad_p = repo.get_field("gp");
-                    thinbody::sum_momentum_fluxes(
-                        repo, ICNS::ndim,
-                        lev, mfi, bx, geom[lev],
-                        (*flux_x)(lev).const_array(mfi),
-                        (*flux_y)(lev).const_array(mfi),
-                        (*flux_z)(lev).const_array(mfi),
-                        grad_p(lev).const_array(mfi));
                 }
             }
         }

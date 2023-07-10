@@ -50,6 +50,7 @@ void ActuatorContainer::initialize_container()
     m_data.position.resize(total_pts);
     m_data.velocity.resize(total_pts);
     m_data.density.resize(total_pts);
+    m_data.est_force.resize(total_pts);
 
     {
         const int nproc = amrex::ParallelDescriptor::NProcs();
@@ -261,6 +262,7 @@ void ActuatorContainer::populate_field_buffers()
     {
         auto& vel_arr = m_data.velocity;
         auto& den_arr = m_data.density;
+        auto& est_arr = m_data.est_force;
         const int npts = static_cast<int>(vel_arr.size());
         const int ioff = m_proc_offsets[amrex::ParallelDescriptor::MyProc()];
         for (int i = 0; i < npts; ++i) {
@@ -269,6 +271,9 @@ void ActuatorContainer::populate_field_buffers()
             }
             den_arr[i] =
                 buff_host[(ioff + i) * NumPStructReal + AMREX_SPACEDIM];
+            for (int j = 0; j < AMREX_SPACEDIM; ++j) {
+                est_arr[i][j] = buff_host[(ioff + i) * NumPStructReal + AMREX_SPACEDIM+1 + j];
+            }
         }
     }
 }
@@ -395,12 +400,9 @@ void ActuatorContainer::mark_surface_faces(
             amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(const int ip) noexcept {
                 auto& pp = pstruct[ip];
                 // Determine offsets _from the nearest node_
-                const amrex::Real x =
-                    (pp.pos(0) - plo[0]) * dxi[0];
-                const amrex::Real y =
-                    (pp.pos(1) - plo[1]) * dxi[1];
-                const amrex::Real z =
-                    (pp.pos(2) - plo[2]) * dxi[2];
+                const amrex::Real x = (pp.pos(0) - plo[0]) * dxi[0];
+                const amrex::Real y = (pp.pos(1) - plo[1]) * dxi[1];
+                const amrex::Real z = (pp.pos(2) - plo[2]) * dxi[2];
 
                 // Index of the low corner
                 constexpr amrex::Real domain_eps = 1.0e-6;
@@ -448,6 +450,122 @@ void ActuatorContainer::mark_surface_faces(
                             << " --> ("<<x<<","<<y<<","<<z<<")"
                             << " mark zface at ("<<i<<","<<j<<","<<k<<")"
                             << std::endl;
+                }
+            });
+        }
+    }
+}
+
+/** Estimate force based on a local control volume and no penetration condition
+ *
+ *  Used by the ThinBody actuator. Based on mark_surface_faces(). Momentum sum
+ *  occurs during the ICNS advective update.
+ */
+void ActuatorContainer::estimate_force(
+    const Field& mom_sum)
+{
+    BL_PROFILE("amr-wind::actuator::ActuatorContainer::estimate_force");
+    AMREX_ALWAYS_ASSERT(m_container_initialized && m_is_scattered);
+
+    const bool DEBUG = true;
+
+    const int nlevels = m_mesh.finestLevel() + 1;
+    for (int lev = 0; lev < nlevels; ++lev) {
+        const auto& geom = m_mesh.Geom(lev);
+        const auto dx = geom.CellSizeArray();
+        const auto dxi = geom.InvCellSizeArray();
+        const auto plo = geom.ProbLoArray();
+
+        for (ParIterType pti(*this, lev); pti.isValid(); ++pti) {
+            const int np = pti.numParticles();
+            auto* pstruct = pti.GetArrayOfStructs()().data();
+            const auto cv_arr = mom_sum(lev).array(pti);
+
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(const int ip) noexcept {
+                auto& pp = pstruct[ip];
+                // Determine offsets _from the nearest node_
+                const amrex::Real x = (pp.pos(0) - plo[0]) * dxi[0];
+                const amrex::Real y = (pp.pos(1) - plo[1]) * dxi[1];
+                const amrex::Real z = (pp.pos(2) - plo[2]) * dxi[2];
+
+                // Index of the low corner
+                constexpr amrex::Real domain_eps = 1.0e-6;
+                const int i = static_cast<int>(std::floor(x + domain_eps));
+                const int j = static_cast<int>(std::floor(y + domain_eps));
+                const int k = static_cast<int>(std::floor(z + domain_eps));
+
+                const int iproc = pp.cpu();
+
+                // x,y,z will be integers if the requested position is
+                // staggered, unlike interpolate_fields
+                //
+                // See NumPStructReal def in ActuatorContainer.H
+                const int idx = AMREX_SPACEDIM + 1;
+                amrex::Real xcc = plo[0] + (i+0.5)*dx[0];
+                amrex::Real ycc = plo[1] + (j+0.5)*dx[1];
+                amrex::Real zcc = plo[2] + (k+0.5)*dx[2];
+                if (x==i) {
+                    // surface is on a x-face
+                    pp.rdata(idx  ) = cv_arr(i-1,j,k,0) + cv_arr(i,j,k,0);
+                    pp.rdata(idx+1) = cv_arr(i-1,j,k,1) + cv_arr(i,j,k,1);
+                    pp.rdata(idx+2) = cv_arr(i-1,j,k,2) + cv_arr(i,j,k,2);
+                    if (DEBUG) {
+                        AMREX_ALWAYS_ASSERT(std::abs((xcc-dx[0]) - (pp.pos(0)-dx[0]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        - (pp.pos(0)+dx[0]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " xsurf i,j,k = "<<i<<","<<j<<","<<k
+                            << " est_force = ("<<cv_arr(i-1,j,k,0)<<","<<cv_arr(i-1,j,k,1)<<","<<cv_arr(i-1,j,k,2)<<")"
+                            <<             " ("<<cv_arr(i  ,j,k,0)<<","<<cv_arr(i  ,j,k,1)<<","<<cv_arr(i  ,j,k,2)<<")"
+                            //<< " at ("<<xcc-dx[0]<<","<<ycc<<","<<zcc<<")"
+                            //<<    " ("<<xcc      <<","<<ycc<<","<<zcc<<")"
+                            << std::endl;
+                    }
+                }
+                if (y==j) {
+                    // surface is on a y-face
+                    pp.rdata(idx  ) = cv_arr(i,j-1,k,0) + cv_arr(i,j,k,0);
+                    pp.rdata(idx+1) = cv_arr(i,j-1,k,1) + cv_arr(i,j,k,1);
+                    pp.rdata(idx+2) = cv_arr(i,j-1,k,2) + cv_arr(i,j,k,2);
+                    if (DEBUG) {
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs((ycc-dx[1]) - (pp.pos(1)-dx[1]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        - (pp.pos(1)+dx[1]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " ysurf i,j,k = "<<i<<","<<j<<","<<k
+                            << " est_force = ("<<cv_arr(i,j-1,k,0)<<","<<cv_arr(i,j-1,k,1)<<","<<cv_arr(i,j-1,k,2)<<")"
+                            <<             " ("<<cv_arr(i,j  ,k,0)<<","<<cv_arr(i,j  ,k,1)<<","<<cv_arr(i,j  ,k,2)<<")"
+                            //<< " at ("<<xcc<<","<<ycc-dx[1]<<","<<zcc<<")"
+                            //<<    " ("<<xcc<<","<<ycc      <<","<<zcc<<")"
+                            << std::endl;
+                    }
+                }
+                if (z==k) {
+                    // surface is on a z-face
+                    pp.rdata(idx  ) = cv_arr(i,j,k-1,0) + cv_arr(i,j,k,0);
+                    pp.rdata(idx+1) = cv_arr(i,j,k-1,1) + cv_arr(i,j,k,1);
+                    pp.rdata(idx+2) = cv_arr(i,j,k-1,2) + cv_arr(i,j,k,2);
+                    if (DEBUG) {
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs((zcc-dx[2]) - (pp.pos(2)-dx[2]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        - (pp.pos(2)+dx[2]/2)) < 1e-14);
+                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                            << " particle " << pp.idata(0)
+                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                            << " zsurf i,j,k = "<<i<<","<<j<<","<<k
+                            << " est_force = ("<<cv_arr(i,j,k-1,0)<<","<<cv_arr(i,j,k-1,1)<<","<<cv_arr(i,j,k-1,2)<<")"
+                            <<             " ("<<cv_arr(i,j,k  ,0)<<","<<cv_arr(i,j,k  ,1)<<","<<cv_arr(i,j,k  ,2)<<")"
+                            //<< " at ("<<xcc<<","<<ycc<<","<<zcc-dx[2]<<")"
+                            //<<    " ("<<xcc<<","<<ycc<<","<<zcc      <<")"
+                            << std::endl;
+                    }
                 }
             });
         }

@@ -32,12 +32,12 @@ static void sum_momentum_fluxes(
     amrex::ParallelFor(bx, ndim,
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
             flux_sum_arr(i, j, k, n) =
-                + xf_mask_arr(i+1,j  ,k  , n) * flux_x_arr(i+1,j  ,k  )
-                - xf_mask_arr(i  ,j  ,k  , n) * flux_x_arr(i  ,j  ,k  )
-                + yf_mask_arr(i  ,j+1,k  , n) * flux_y_arr(i  ,j+1,k  )
-                - yf_mask_arr(i  ,j  ,k  , n) * flux_y_arr(i  ,j  ,k  )
-                + zf_mask_arr(i  ,j  ,k+1, n) * flux_z_arr(i  ,j  ,k+1)
-                - zf_mask_arr(i  ,j  ,k  , n) * flux_z_arr(i  ,j  ,k  )
+                + xf_mask_arr(i+1,j  ,k  ) * flux_x_arr(i+1,j  ,k  , n)
+                - xf_mask_arr(i  ,j  ,k  ) * flux_x_arr(i  ,j  ,k  , n)
+                + yf_mask_arr(i  ,j+1,k  ) * flux_y_arr(i  ,j+1,k  , n)
+                - yf_mask_arr(i  ,j  ,k  ) * flux_y_arr(i  ,j  ,k  , n)
+                + zf_mask_arr(i  ,j  ,k+1) * flux_z_arr(i  ,j  ,k+1, n)
+                - zf_mask_arr(i  ,j  ,k  ) * flux_z_arr(i  ,j  ,k  , n)
                 + gp_arr(i,j,k,n)*cellvol;
         });
 }

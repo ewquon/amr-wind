@@ -38,6 +38,10 @@ struct ActuatorCloud
     //! Density of all actuator nodes belonging to this MPI rank
     amrex::Vector<amrex::Real> density;
 
+    //! Force estimate for all actuator nodes belonging to this MPI rank
+    //  used by ThinBody actuator only
+    amrex::Vector<vs::Vector> est_force;
+
     //! Total number of turbines located on this MPI rank
     int num_objects;
 
@@ -45,7 +49,10 @@ struct ActuatorCloud
 };
 
 //! Number or real entries in Array of Structs (AOS)
-static constexpr int NumPStructReal = AMREX_SPACEDIM + 1;
+//  velocity:  0 to AMREX_SPACEDIM-1
+//  density:   AMREX_SPACEDIM
+//  est_force: AMREX_SPACEDIM+1 to AMREX_SPACEDIM+3
+static constexpr int NumPStructReal = AMREX_SPACEDIM + 4;
 //! Number of integer entries in Array of Structs (AOS)
 static constexpr int NumPStructInt = 1;
 //! Number of real entries in Struct of Arrays (SOA)
@@ -94,6 +101,7 @@ public:
 
     // for ThinBody actuator
     void mark_surface_faces(IntField& xface, IntField& yface, IntField& zface);
+    void estimate_force(const Field& mom_sum);
 
 protected:
     void compute_local_coordinates();

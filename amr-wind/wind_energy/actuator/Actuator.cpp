@@ -192,12 +192,18 @@ void Actuator::update_positions()
             auto& yface = m_sim.repo().get_int_field("mom_yface_mask");
             auto& zface = m_sim.repo().get_int_field("mom_zface_mask");
             m_container->mark_surface_faces(xface,yface,zface);
+
+            // Get the mom_sum calculated during the previous solution advance
+            const auto& mom_sum = m_sim.repo().get_field("mom_sum");
+            m_container->estimate_force(mom_sum);
         }
 
         // Sample velocities at the new locations
         const auto& vel = m_sim.repo().get_field("velocity");
         const auto& density = m_sim.repo().get_field("density");
-        m_container->sample_fields(vel, density);
+        m_container->sample_fields(vel, density); // Note: this restores the particles and makes
+                                                  // the data available to the actuator instances,
+                                                  // so do this last
     }
     else
     {
