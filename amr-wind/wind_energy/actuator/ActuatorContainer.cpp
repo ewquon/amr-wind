@@ -380,9 +380,11 @@ void ActuatorContainer::mark_surface_faces(
 
     const bool DEBUG = false;
 
-    xface.setVal(1);
-    yface.setVal(1);
-    zface.setVal(1);
+    if (DEBUG)
+        amrex::Print() << "Marking surface faces" << std::endl;
+    xface.setVal(0);
+    yface.setVal(0);
+    zface.setVal(0);
 
     const int nlevels = m_mesh.finestLevel() + 1;
     for (int lev = 0; lev < nlevels; ++lev) {
@@ -390,12 +392,25 @@ void ActuatorContainer::mark_surface_faces(
         const auto dxi = geom.InvCellSizeArray();
         const auto plo = geom.ProbLoArray();
 
+        auto& xffab = xface(lev);
+        auto& yffab = yface(lev);
+        auto& zffab = zface(lev);
+
+        // Note: This particle iterator code will only execute on grids
+        // _that contain particles_
         for (ParIterType pti(*this, lev); pti.isValid(); ++pti) {
             const int np = pti.numParticles();
             auto* pstruct = pti.GetArrayOfStructs()().data();
-            const auto xf_arr = xface(lev).array(pti);
-            const auto yf_arr = yface(lev).array(pti);
-            const auto zf_arr = zface(lev).array(pti);
+            const auto& xf_arr = xffab.array(pti);
+            const auto& yf_arr = yffab.array(pti);
+            const auto& zf_arr = zffab.array(pti);
+
+            if (DEBUG)
+                amrex::Print() << "pti (lev="<<lev<<")"
+                    << " Array4("<<yf_arr.begin.x<<":"<<yf_arr.end.x-1<<","
+                                 <<yf_arr.begin.y<<":"<<yf_arr.end.y-1<<","
+                                 <<yf_arr.begin.z<<":"<<yf_arr.end.z-1<<")"
+                    << std::endl;
 
             amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(const int ip) noexcept {
                 auto& pp = pstruct[ip];
@@ -410,49 +425,41 @@ void ActuatorContainer::mark_surface_faces(
                 const int j = static_cast<int>(std::floor(y + domain_eps));
                 const int k = static_cast<int>(std::floor(z + domain_eps));
 
-                const int iproc = pp.cpu();
-
-                //amrex::AllPrint() << "[iproc="<<iproc<<"]"
-                //    << " mark particle " << pp.idata(0)
-                //    << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
-                //    << " --> ("<<x<<","<<y<<","<<z<<")"
-                //    << " at ("<<i<<","<<j<<","<<k<<")"
-                //    << std::endl;
+                if (DEBUG)
+                    amrex::AllPrint() << "[iproc="<<pp.cpu()<<"]"
+                        << " mark particle " << pp.idata(0)
+                        << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
+                        << " --> ("<<x<<","<<y<<","<<z<<")"
+                        << " at ("<<i<<","<<j<<","<<k<<")"
+                        << std::endl;
 
                 // x,y,z will be integers if the requested position is
                 // staggered, unlike interpolate_fields
                 if (x==i) {
-                    xf_arr(i,j,k) = 0;
-                    if (DEBUG)
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
-                            << " particle " << pp.idata(0)
-                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
-                            << " --> ("<<x<<","<<y<<","<<z<<")"
-                            << " mark xface at ("<<i<<","<<j<<","<<k<<")"
-                            << std::endl;
+                    xf_arr(i,j,k) = -1;
                 }
                 if (y==j) {
-                    yf_arr(i,j,k) = 0;
-                    if (DEBUG)
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
-                            << " particle " << pp.idata(0)
-                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
-                            << " --> ("<<x<<","<<y<<","<<z<<")"
-                            << " mark yface at ("<<i<<","<<j<<","<<k<<")"
-                            << std::endl;
+                    yf_arr(i,j,k) = -1;
                 }
                 if (z==k) {
-                    zf_arr(i,j,k) = 0;
-                    if (DEBUG)
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
-                            << " particle " << pp.idata(0)
-                            << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
-                            << " --> ("<<x<<","<<y<<","<<z<<")"
-                            << " mark zface at ("<<i<<","<<j<<","<<k<<")"
-                            << std::endl;
+                    zf_arr(i,j,k) = -1;
                 }
             });
         }
+
+        // At this point, faces will be set to -1, but we still need to handle
+        // the fringe case in which a face lies on grid boundaries. The
+        // particle iteration will only select one of the adjacent grids and
+        // therefore not all grids will have the same face flagged.
+        xffab.SumBoundary(geom.periodicity());
+        yffab.SumBoundary(geom.periodicity());
+        zffab.SumBoundary(geom.periodicity());
+
+        // Now all surface faces will be -1, so add 1 to have face fields be 0
+        // on faces and 1 everywhere else
+        xffab.plus(1,0,1);
+        yffab.plus(1,0,1);
+        zffab.plus(1,0,1);
     }
 }
 
