@@ -266,6 +266,7 @@ void ActuatorContainer::populate_field_buffers()
         const int npts = static_cast<int>(vel_arr.size());
         const int ioff = m_proc_offsets[amrex::ParallelDescriptor::MyProc()];
         for (int i = 0; i < npts; ++i) {
+            // See NumPStructReal def in ActuatorContainer.H
             for (int j = 0; j < AMREX_SPACEDIM; ++j) {
                 vel_arr[i][j] = buff_host[(ioff + i) * NumPStructReal + j];
             }
@@ -457,7 +458,7 @@ void ActuatorContainer::mark_surface_faces(
 
         // Now all surface faces will be -1, so add 1 to have face fields be 0
         // on faces and 1 everywhere else
-        xffab.plus(1,0,1);
+        xffab.plus(1,0,1); // val, comp, num_comp, nghost=0
         yffab.plus(1,0,1);
         zffab.plus(1,0,1);
     }
@@ -501,8 +502,6 @@ void ActuatorContainer::estimate_force(
                 const int j = static_cast<int>(std::floor(y + domain_eps));
                 const int k = static_cast<int>(std::floor(z + domain_eps));
 
-                const int iproc = pp.cpu();
-
                 // x,y,z will be integers if the requested position is
                 // staggered, unlike interpolate_fields
                 //
@@ -517,11 +516,7 @@ void ActuatorContainer::estimate_force(
                     pp.rdata(idx+1) = cv_arr(i-1,j,k,1) + cv_arr(i,j,k,1);
                     pp.rdata(idx+2) = cv_arr(i-1,j,k,2) + cv_arr(i,j,k,2);
                     if (DEBUG) {
-                        AMREX_ALWAYS_ASSERT(std::abs((xcc-dx[0]) - (pp.pos(0)-dx[0]/2)) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( xcc        - (pp.pos(0)+dx[0]/2)) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                        amrex::AllPrint() << "[iproc="<<pp.cpu()<<"]"
                             << " particle " << pp.idata(0)
                             << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
                             << " xsurf i,j,k = "<<i<<","<<j<<","<<k
@@ -530,6 +525,10 @@ void ActuatorContainer::estimate_force(
                             //<< " at ("<<xcc-dx[0]<<","<<ycc<<","<<zcc<<")"
                             //<<    " ("<<xcc      <<","<<ycc<<","<<zcc<<")"
                             << std::endl;
+                        AMREX_ALWAYS_ASSERT(std::abs((xcc-dx[0]) - (pp.pos(0)-dx[0]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        - (pp.pos(0)+dx[0]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
                     }
                 }
                 if (y==j) {
@@ -538,11 +537,7 @@ void ActuatorContainer::estimate_force(
                     pp.rdata(idx+1) = cv_arr(i,j-1,k,1) + cv_arr(i,j,k,1);
                     pp.rdata(idx+2) = cv_arr(i,j-1,k,2) + cv_arr(i,j,k,2);
                     if (DEBUG) {
-                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs((ycc-dx[1]) - (pp.pos(1)-dx[1]/2)) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( ycc        - (pp.pos(1)+dx[1]/2)) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                        amrex::AllPrint() << "[iproc="<<pp.cpu()<<"]"
                             << " particle " << pp.idata(0)
                             << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
                             << " ysurf i,j,k = "<<i<<","<<j<<","<<k
@@ -551,6 +546,10 @@ void ActuatorContainer::estimate_force(
                             //<< " at ("<<xcc<<","<<ycc-dx[1]<<","<<zcc<<")"
                             //<<    " ("<<xcc<<","<<ycc      <<","<<zcc<<")"
                             << std::endl;
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs((ycc-dx[1]) - (pp.pos(1)-dx[1]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        - (pp.pos(1)+dx[1]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        -  pp.pos(2)         ) < 1e-14);
                     }
                 }
                 if (z==k) {
@@ -559,11 +558,7 @@ void ActuatorContainer::estimate_force(
                     pp.rdata(idx+1) = cv_arr(i,j,k-1,1) + cv_arr(i,j,k,1);
                     pp.rdata(idx+2) = cv_arr(i,j,k-1,2) + cv_arr(i,j,k,2);
                     if (DEBUG) {
-                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs((zcc-dx[2]) - (pp.pos(2)-dx[2]/2)) < 1e-14);
-                        AMREX_ALWAYS_ASSERT(std::abs( zcc        - (pp.pos(2)+dx[2]/2)) < 1e-14);
-                        amrex::AllPrint() << "[iproc="<<iproc<<"]"
+                        amrex::AllPrint() << "[iproc="<<pp.cpu()<<"]"
                             << " particle " << pp.idata(0)
                             << " ("<<pp.pos(0)<<","<<pp.pos(1)<<","<<pp.pos(2)<<")"
                             << " zsurf i,j,k = "<<i<<","<<j<<","<<k
@@ -572,6 +567,10 @@ void ActuatorContainer::estimate_force(
                             //<< " at ("<<xcc<<","<<ycc<<","<<zcc-dx[2]<<")"
                             //<<    " ("<<xcc<<","<<ycc<<","<<zcc      <<")"
                             << std::endl;
+                        AMREX_ALWAYS_ASSERT(std::abs( xcc        -  pp.pos(0)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( ycc        -  pp.pos(1)         ) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs((zcc-dx[2]) - (pp.pos(2)-dx[2]/2)) < 1e-14);
+                        AMREX_ALWAYS_ASSERT(std::abs( zcc        - (pp.pos(2)+dx[2]/2)) < 1e-14);
                     }
                 }
             });

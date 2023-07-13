@@ -317,7 +317,9 @@ struct ComputeForceOp<
             // assuming unit density: f ~ dv/dt
             auto wvel_normal = wvel;
             wvel_normal.x() = 0.0;
-            grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
+
+            // grid.force is set to the CV analysis estimate with ActModel::update_fields()
+            //grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
 
 
             // Compute 2-D lift, drag assuming unit density

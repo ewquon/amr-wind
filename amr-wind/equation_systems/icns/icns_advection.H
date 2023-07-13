@@ -477,13 +477,15 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         // use the same advective fluxes for the CV analysis as the solution
         // advance.
         if (thinbody_actuator) {
+            auto& cvsum = repo.get_field("mom_sum");
             const auto& grad_p = repo.get_field("gp"); // cell-centered
 
             for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
-                amrex::AllPrint()
-                    << "[iproc="<<amrex::ParallelDescriptor::MyProc()<<"]"
-                    << " Summing fluxes (lev="<<lev<<")" << std::endl;
+                //amrex::AllPrint()
+                //    << "[iproc="<<amrex::ParallelDescriptor::MyProc()<<"]"
+                //    << " Summing fluxes (lev="<<lev<<")" << std::endl;
 
+                /*
                 for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
                      mfi.isValid(); ++mfi) {
                     const auto& bx = mfi.tilebox();
@@ -496,6 +498,26 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         (*flux_z)(lev).const_array(mfi),
                         grad_p(lev).const_array(mfi));
                 }
+                */
+
+                // Unfortunately, doesn't work with MultiFab * iMultiFab
+                //amrex::MultiFab::Multiply((*flux_x)(lev), xface_mask(lev), 0, 0, 1, 0);
+                //amrex::MultiFab::Multiply((*flux_y)(lev), yface_mask(lev), 0, 0, 1, 0);
+                //amrex::MultiFab::Multiply((*flux_z)(lev), zface_mask(lev), 0, 0, 1, 0);
+                for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
+                     mfi.isValid(); ++mfi) {
+                    const auto& bx = mfi.tilebox();
+
+                    thinbody::zero_surface_fluxes(
+                        repo, ICNS::ndim,
+                        lev, mfi, geom[lev],
+                        (*flux_x)(lev).array(mfi),
+                        (*flux_y)(lev).array(mfi),
+                        (*flux_z)(lev).array(mfi));
+                }
+
+                // Set ghost points for particle sampling on both sides of the surface
+                cvsum(lev).FillBoundary(geom[lev].periodicity());
             }
         }
 

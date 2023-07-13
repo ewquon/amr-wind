@@ -55,6 +55,7 @@ public:
     virtual void update_fields(
         const VecSlice&,
         const RealSlice&,
+        const VecSlice&,
         bool update) = 0;
 
     virtual void integrate_weighted_velocities(
@@ -164,15 +165,19 @@ public:
         m_vel_op(lev, mfi, geom);
     }
 
-    void update_fields(const VecSlice& vel, const RealSlice& density, bool update) override
+    void update_fields(
+        const VecSlice& vel,
+        const RealSlice& density,
+        const VecSlice& est_force,
+        bool update) override
     {
         m_vel_op.post();
 
         if (update)
         {
-            std::copy(vel.begin(), vel.end(), m_data.grid().vel.begin());
-            std::copy(
-                density.begin(), density.end(), m_data.grid().density.begin());
+            std::copy(      vel.begin(),       vel.end(), m_data.grid().vel.begin());
+            std::copy(  density.begin(),   density.end(), m_data.grid().density.begin());
+            std::copy(est_force.begin(), est_force.end(), m_data.grid().force.begin());
         }
         ops::UpdateVelOp<ActTrait, SrcTrait>()(m_data);
     }

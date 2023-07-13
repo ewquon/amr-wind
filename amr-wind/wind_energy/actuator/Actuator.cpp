@@ -260,17 +260,18 @@ void Actuator::update_velocities()
 
         const auto vel =
             ::amr_wind::utils::slice(pinfo.velocity, ic, pinfo.num_pts[i]);
-
         const auto density =
             ::amr_wind::utils::slice(pinfo.density, ic, pinfo.num_pts[i]);
+        const auto est_force =
+            ::amr_wind::utils::slice(pinfo.est_force, ic, pinfo.num_pts[i]);
 
         if (m_weighted_sampling) {
             // This will just call ops::UpdateVelOp
-            m_actuators[ig]->update_fields(vel, density, false);
+            m_actuators[ig]->update_fields(vel, density, est_force, false);
         } else {
             // This will copy the particle velocities to the actuator grid
             // prior to calling ops::UpdateVelOp
-            m_actuators[ig]->update_fields(vel, density, true);
+            m_actuators[ig]->update_fields(vel, density, est_force, true);
         }
         ic += pinfo.num_pts[i];
     }
