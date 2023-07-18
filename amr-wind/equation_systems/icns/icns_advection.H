@@ -6,7 +6,8 @@
 #include "amr-wind/equation_systems/icns/icns.H"
 #include "amr-wind/equation_systems/vof/vof_momentum_flux.H"
 
-#include "amr-wind/thin_body/thinbody_CV_analysis.H"
+#include "amr-wind/thin_body/ThinBodyCV.H"
+//#include "amr-wind/thin_body/ThinBodyInterface.H"
 
 #include "AMReX_MultiFabUtil.H"
 #include "hydro_MacProjector.H"
@@ -138,6 +139,8 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         const auto& src_term = fields.src_term;
         const auto& dof_field = fields.field.state(fstate);
         auto bcrec_device = dof_field.bcrec_device();
+
+        //const bool thinbody_actuator = repo.field_exists("mom_sum");
 
         for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
             u_mac(lev).setBndry(0.0);
@@ -287,6 +290,19 @@ struct AdvectionOp<ICNS, fvm::Godunov>
             } else {
                 amrex::Abort("Invalid godunov scheme");
             }
+
+            /*
+            if (thinbody_actuator) {
+                for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
+                     mfi.isValid(); ++mfi) {
+                    thinbody::zero_surface_face_vel(
+                        repo, lev, mfi,
+                        u_mac(lev).array(mfi),
+                        v_mac(lev).array(mfi),
+                        w_mac(lev).array(mfi));
+                }
+            }
+            */
         }
 
         if (m_verbose > 2) {
@@ -472,48 +488,21 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 geom[lev - 1]);
         }
 
-        // Thin Body Actuator estimates the surface actuator force based on a
-        // local control-volume analysis above/below a zero-thickness body. We
-        // use the same advective fluxes for the CV analysis as the solution
-        // advance.
+        // Update surface force distribution based on control volume analysis,
+        // which will be sampled and stored in the ThinBody actuator
         if (thinbody_actuator) {
             auto& cvsum = repo.get_field("mom_sum");
-            const auto& grad_p = repo.get_field("gp"); // cell-centered
 
             for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
-                //amrex::AllPrint()
-                //    << "[iproc="<<amrex::ParallelDescriptor::MyProc()<<"]"
-                //    << " Summing fluxes (lev="<<lev<<")" << std::endl;
-
-                /*
                 for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
                      mfi.isValid(); ++mfi) {
                     const auto& bx = mfi.tilebox();
-
                     thinbody::sum_momentum_fluxes(
                         repo, ICNS::ndim,
                         lev, mfi, bx, geom[lev],
                         (*flux_x)(lev).const_array(mfi),
                         (*flux_y)(lev).const_array(mfi),
-                        (*flux_z)(lev).const_array(mfi),
-                        grad_p(lev).const_array(mfi));
-                }
-                */
-
-                // Unfortunately, doesn't work with MultiFab * iMultiFab
-                //amrex::MultiFab::Multiply((*flux_x)(lev), xface_mask(lev), 0, 0, 1, 0);
-                //amrex::MultiFab::Multiply((*flux_y)(lev), yface_mask(lev), 0, 0, 1, 0);
-                //amrex::MultiFab::Multiply((*flux_z)(lev), zface_mask(lev), 0, 0, 1, 0);
-                for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
-                     mfi.isValid(); ++mfi) {
-                    const auto& bx = mfi.tilebox();
-
-                    thinbody::zero_surface_fluxes(
-                        repo, ICNS::ndim,
-                        lev, mfi, geom[lev],
-                        (*flux_x)(lev).array(mfi),
-                        (*flux_y)(lev).array(mfi),
-                        (*flux_z)(lev).array(mfi));
+                        (*flux_z)(lev).const_array(mfi));
                 }
 
                 // Set ghost points for particle sampling on both sides of the surface
