@@ -90,7 +90,8 @@ void incflo::init_amr_wind_modules()
     BL_PROFILE("amr-wind::incflo::init_amr_wind_modules");
     if (m_sim.has_overset()) {
         m_sim.overset_manager()->post_init_actions();
-    } else {
+    } else if (!m_sim.repo().int_field_exists("mask_cell"))  {
+        amrex::Print() << "Creating dummy mask fields" << std::endl;
         auto& mask_cell = m_sim.repo().declare_int_field("mask_cell", 1, 1);
         auto& mask_node = m_sim.repo().declare_int_field(
             "mask_node", 1, 1, 1, amr_wind::FieldLoc::NODE);

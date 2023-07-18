@@ -213,11 +213,16 @@ struct InitDataOp<ThinBody, ActSrcLine>
         // ncomp = 3, ngrow = 1
         data.sim().repo().declare_field("mom_sum",3,1);
 
-        // Create masks used to zero the surface flux
+        // Create masks used to zero the surface velocity/flux
         // ncomp = 1, ngrow = 0
         data.sim().repo().declare_int_field("mom_xface_mask",1,0,1,amr_wind::FieldLoc::XFACE);
         data.sim().repo().declare_int_field("mom_yface_mask",1,0,1,amr_wind::FieldLoc::YFACE);
         data.sim().repo().declare_int_field("mom_zface_mask",1,0,1,amr_wind::FieldLoc::ZFACE);
+
+        // Create masks for overset-like solves
+        int nghost = data.sim().pde_manager().num_ghost_state();
+        data.sim().repo().declare_int_field("mask_cell",1,nghost);
+        data.sim().repo().declare_int_field("mask_node",1,nghost,1,FieldLoc::NODE);
     }
 };
 
