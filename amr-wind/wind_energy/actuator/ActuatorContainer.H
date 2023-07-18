@@ -100,7 +100,12 @@ public:
     void initialize_particles(const int total_pts);
 
     // for ThinBody actuator
-    void mark_surface_faces(IntField& xface, IntField& yface, IntField& zface);
+    void mark_surface_faces(
+        IntField& xface,
+        IntField& yface,
+        IntField& zface,
+        IntField& mask_cell,
+        IntField& mask_node);
     void estimate_force(const Field& mom_sum);
 
 protected:

@@ -195,7 +195,9 @@ void Actuator::update_positions()
                 auto& xface = m_sim.repo().get_int_field("mom_xface_mask");
                 auto& yface = m_sim.repo().get_int_field("mom_yface_mask");
                 auto& zface = m_sim.repo().get_int_field("mom_zface_mask");
-                m_container->mark_surface_faces(xface,yface,zface);
+                auto& mask_cell = m_sim.repo().get_int_field("mask_cell");
+                auto& mask_node = m_sim.repo().get_int_field("mask_node");
+                m_container->mark_surface_faces(xface,yface,zface,mask_cell,mask_node);
                 if (!m_update_actuator_faces)
                     m_need_mark_faces = false;
             }

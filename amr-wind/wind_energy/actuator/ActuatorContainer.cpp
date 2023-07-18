@@ -374,7 +374,11 @@ void ActuatorContainer::interpolate_fields(
  *  Used by the ThinBody actuator. Based on interpolate_fields().
  */
 void ActuatorContainer::mark_surface_faces(
-    IntField& xface, IntField& yface, IntField& zface)
+    IntField& xface,
+    IntField& yface,
+    IntField& zface,
+    IntField& mask_cell,
+    IntField& mask_node)
 {
     BL_PROFILE("amr-wind::actuator::ActuatorContainer::mark_surface_faces");
     AMREX_ALWAYS_ASSERT(m_container_initialized && m_is_scattered);
@@ -386,6 +390,8 @@ void ActuatorContainer::mark_surface_faces(
     xface.setVal(0);
     yface.setVal(0);
     zface.setVal(0);
+    mask_cell.setVal(0);
+    mask_node.setVal(0);
 
     const int nlevels = m_mesh.finestLevel() + 1;
     for (int lev = 0; lev < nlevels; ++lev) {
@@ -396,6 +402,8 @@ void ActuatorContainer::mark_surface_faces(
         auto& xffab = xface(lev);
         auto& yffab = yface(lev);
         auto& zffab = zface(lev);
+        auto& mcfab = mask_cell(lev);
+        auto& mnfab = mask_node(lev);
 
         // Note: This particle iterator code will only execute on grids
         // _that contain particles_
@@ -405,6 +413,8 @@ void ActuatorContainer::mark_surface_faces(
             const auto& xf_arr = xffab.array(pti);
             const auto& yf_arr = yffab.array(pti);
             const auto& zf_arr = zffab.array(pti);
+            const auto& mc_arr = mcfab.array(pti);
+            const auto& mn_arr = mnfab.array(pti);
 
             if (DEBUG)
                 amrex::Print() << "pti (lev="<<lev<<")"
@@ -435,32 +445,61 @@ void ActuatorContainer::mark_surface_faces(
                         << std::endl;
 
                 // x,y,z will be integers if the requested position is
-                // staggered, unlike interpolate_fields
+                // staggered, unlike interpolate_fields. If a surface face is
+                // found, mark the face and the adjacent cells/nodes. Each face
+                // will have 2 adjacent cells and 4 adjacent nodes.
                 if (x==i) {
-                    xf_arr(i,j,k) = -1;
+                    xf_arr(i  ,j  ,k  ) = -1; // staggered in i
+                    mc_arr(i  ,j  ,k  ) = -1;
+                    mc_arr(i-1,j  ,k  ) = -1;
+                    mn_arr(i  ,j  ,k  ) = -1;
+                    mn_arr(i  ,j+1,k  ) = -1;
+                    mn_arr(i  ,j  ,k+1) = -1;
+                    mn_arr(i  ,j+1,k+1) = -1;
                 }
                 if (y==j) {
-                    yf_arr(i,j,k) = -1;
+                    yf_arr(i  ,j  ,k  ) = -1; // staggered in j
+                    mc_arr(i  ,j  ,k  ) = -1;
+                    mc_arr(i  ,j-1,k  ) = -1;
+                    mn_arr(i  ,j  ,k  ) = -1;
+                    mn_arr(i+1,j  ,k  ) = -1;
+                    mn_arr(i  ,j  ,k+1) = -1;
+                    mn_arr(i+1,j  ,k+1) = -1;
                 }
                 if (z==k) {
-                    zf_arr(i,j,k) = -1;
+                    zf_arr(i  ,j  ,k  ) = -1; // staggered in k
+                    mc_arr(i  ,j  ,k  ) = -1;
+                    mc_arr(i  ,j  ,k-1) = -1;
+                    mn_arr(i  ,j  ,k  ) = -1;
+                    mn_arr(i+1,j  ,k  ) = -1;
+                    mn_arr(i  ,j+1,k  ) = -1;
+                    mn_arr(i+1,j+1,k  ) = -1;
                 }
             });
         }
 
-        // At this point, faces will be set to -1, but we still need to handle
-        // the fringe case in which a face lies on grid boundaries. The
-        // particle iteration will only select one of the adjacent grids and
-        // therefore not all grids will have the same face flagged.
+        // At this point, faces/cells/nodes will be set to -1, but we still
+        // need to handle the fringe case in which a face/cell lies on grid
+        // boundaries or ghost cells/nodes. The particle iteration will only
+        // select one of the adjacent grids (assuming the actuator point lies
+        // on a face) and therefore not all grids will necessarily have the
+        // same face/cells/nodes flagged.
         xffab.SumBoundary(geom.periodicity());
         yffab.SumBoundary(geom.periodicity());
         zffab.SumBoundary(geom.periodicity());
+        mcfab.SumBoundary(geom.periodicity());
+        mnfab.SumBoundary(geom.periodicity());
 
-        // Now all surface faces will be -1, so add 1 to have face fields be 0
-        // on faces and 1 everywhere else
+        // Now all surface faces (and adjacent cells/nodes) will be -1, so add
+        // 1 to have the masks be:
+        //   0 on (and adjacent to) surface faces
+        //   1 everywhere else
+        int nghost = mask_cell.num_grow()[0];
         xffab.plus(1,0,1); // val, comp, num_comp, nghost=0
         yffab.plus(1,0,1);
         zffab.plus(1,0,1);
+        mcfab.plus(1,0,1,nghost);
+        mnfab.plus(1,0,1,nghost);
     }
 }
 
@@ -475,7 +514,7 @@ void ActuatorContainer::estimate_force(
     BL_PROFILE("amr-wind::actuator::ActuatorContainer::estimate_force");
     AMREX_ALWAYS_ASSERT(m_container_initialized && m_is_scattered);
 
-    const bool DEBUG = true;
+    const bool DEBUG = false;
 
     const int nlevels = m_mesh.finestLevel() + 1;
     for (int lev = 0; lev < nlevels; ++lev) {
