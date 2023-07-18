@@ -8,7 +8,7 @@ namespace amr_wind::thinbody {
  * previously identified by ActuatorContainer::mark_surface_faces(). This is
  * currently implemented for the ThinBody actuator.
  */
-static void zero_adjacent_cell_vel(
+static inline void zero_adjacent_cell_vel(
     const FieldRepo& repo,
     int lev,
     amrex::MFIter& mfi,
@@ -17,16 +17,14 @@ static void zero_adjacent_cell_vel(
     const auto& xface_mask = repo.get_int_field("mom_xface_mask");
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
     const auto& zface_mask = repo.get_int_field("mom_zface_mask");
-    auto& mask_cell = repo.get_int_field("mask_cell");
 
     const auto& xf_mask_arr  = xface_mask(lev).const_array(mfi);
     const auto& yf_mask_arr  = yface_mask(lev).const_array(mfi);
     const auto& zf_mask_arr  = zface_mask(lev).const_array(mfi);
-    const auto& mask_cell_arr = mask_cell(lev).array(mfi);
 
-    const auto& geom = repo.mesh().Geom();
-    const auto plo = geom[lev].ProbLoArray();
-    const auto dx = geom[lev].CellSizeArray();
+    //const auto& geom = repo.mesh().Geom();
+    //const auto plo = geom[lev].ProbLoArray();
+    //const auto dx = geom[lev].CellSizeArray();
 
     const auto& bx = mfi.tilebox();
 
@@ -54,7 +52,7 @@ static void zero_adjacent_cell_vel(
         });
 }
 
-static void zero_surface_face_vel(
+static inline void zero_surface_face_vel(
     const FieldRepo& repo,
     int lev,
     amrex::MFIter& mfi,
@@ -88,6 +86,7 @@ static void zero_surface_face_vel(
         });
 }
 
+/*
 static void zero_surface_fluxes(
     const FieldRepo& repo,
     int ndim,
@@ -148,6 +147,7 @@ static void zero_surface_fluxes(
                 + gp_arr(i,j,k,n)*cellvol;
         });
 }
+*/
 } // namespace amr_wind::thinbody
 
 #endif

@@ -3,7 +3,7 @@
 
 namespace amr_wind::thinbody {
 
-static void sum_momentum_fluxes(
+static inline void sum_momentum_fluxes(
     const FieldRepo& repo,
     int ndim,
     int lev,
