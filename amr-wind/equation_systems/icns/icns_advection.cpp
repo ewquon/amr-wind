@@ -45,6 +45,7 @@ MacProjOp::MacProjOp(
     : m_repo(repo)
     , m_options("mac_proj")
     , m_has_overset(has_overset)
+    , m_need_solver_mask(has_overset || repo.field_exists("mom_sum"))
     , m_variable_density(variable_density)
     , m_mesh_mapping(mesh_mapping)
 {
@@ -56,10 +57,11 @@ void MacProjOp::init_projector(const MacProjOp::FaceFabPtrVec& beta) noexcept
 {
     m_mac_proj = std::make_unique<Hydro::MacProjector>(
         m_repo.mesh().Geom(0, m_repo.num_active_levels() - 1));
+
     m_mac_proj->initProjector(
         m_options.lpinfo(), beta,
-        m_has_overset ? m_repo.get_int_field("mask_cell").vec_const_ptrs()
-                      : amrex::Vector<const amrex::iMultiFab*>());
+        m_need_solver_mask ? m_repo.get_int_field("mask_cell").vec_const_ptrs()
+                           : amrex::Vector<const amrex::iMultiFab*>());
 
     m_options(*m_mac_proj);
 
@@ -83,8 +85,8 @@ void MacProjOp::init_projector(const amrex::Real beta) noexcept
         m_repo.mesh().boxArray(0, m_repo.num_active_levels() - 1),
         m_repo.mesh().DistributionMap(0, m_repo.num_active_levels() - 1),
         m_options.lpinfo(), beta,
-        m_has_overset ? m_repo.get_int_field("mask_cell").vec_const_ptrs()
-                      : amrex::Vector<const amrex::iMultiFab*>());
+        m_need_solver_mask ? m_repo.get_int_field("mask_cell").vec_const_ptrs()
+                           : amrex::Vector<const amrex::iMultiFab*>());
 
     m_options(*m_mac_proj);
 

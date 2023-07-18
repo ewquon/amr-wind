@@ -51,6 +51,7 @@ private:
     std::unique_ptr<Hydro::MacProjector> m_mac_proj;
     MLMGOptions m_options;
     bool m_has_overset{false};
+    bool m_need_solver_mask{false};
     bool m_need_init{true};
     bool m_variable_density{false};
     bool m_mesh_mapping{false};
