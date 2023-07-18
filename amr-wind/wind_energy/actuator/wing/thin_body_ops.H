@@ -326,7 +326,6 @@ struct ComputeForceOp<
             // grid.force is set to the CV analysis estimate with ActModel::update_fields()
             //grid.force[ip] = wdata.gain * -(wvel_normal & tmat) / dt; // in inertial frame
 
-
             // Compute 2-D lift, drag assuming unit density
             amrex::Real cl, cd;
             const auto vmag = vs::mag(wvel);
@@ -347,6 +346,9 @@ struct ComputeForceOp<
 
             total_lift += lift;
             total_drag += drag;
+
+            // Body force should not be needed with new interface treatment
+            grid.force[ip] = amr_wind::vs::Vector::zero();
         }
 
         wdata.lift = total_lift;

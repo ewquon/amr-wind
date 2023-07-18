@@ -7,6 +7,7 @@
 #include "amr-wind/equation_systems/PDEOps.H"
 #include "amr-wind/equation_systems/CompRHSOps.H"
 #include "amr-wind/equation_systems/DiffusionOps.H"
+#include "amr-wind/thin_body/ThinBodyInterface.H"
 
 namespace amr_wind::pde {
 
@@ -55,10 +56,12 @@ public:
     //! Perform initialization actions after the mesh is created
     void initialize() override
     {
+        const bool need_solver_mask = m_sim.has_overset() || m_repo.field_exists("mom_sum");
+
         if (PDE::has_diffusion) {
             BL_PROFILE("amr-wind::" + this->identifier() + "::initialize");
             m_diff_op.reset(new DiffusionOp<PDE, Scheme>(
-                m_fields, m_sim.has_overset(), m_sim.has_mesh_mapping()));
+                m_fields, need_solver_mask, m_sim.has_mesh_mapping()));
             m_turb_op.reset(
                 new TurbulenceOp<PDE>(m_sim.turbulence_model(), m_fields));
         }
@@ -68,7 +71,7 @@ public:
              m_sim.physics_manager().contains("MultiPhase"));
 
         m_adv_op.reset(new AdvectionOp<PDE, Scheme>(
-            m_fields, m_sim.has_overset(), variable_density,
+            m_fields, need_solver_mask, variable_density,
             m_sim.has_mesh_mapping()));
         m_src_op.init_source_terms(m_sim);
     }
@@ -76,11 +79,13 @@ public:
     //! Perform update actions after a regrid is performed
     void post_regrid_actions() override
     {
+        const bool need_solver_mask = m_sim.has_overset() || m_repo.field_exists("mom_sum");
+
         if (PDE::has_diffusion) {
             BL_PROFILE(
                 "amr-wind::" + this->identifier() + "::post_regrid_actions");
             m_diff_op.reset(new DiffusionOp<PDE, Scheme>(
-                m_fields, m_sim.has_overset(), m_sim.has_mesh_mapping()));
+                m_fields, need_solver_mask, m_sim.has_mesh_mapping()));
         }
 
         bool variable_density =
@@ -88,7 +93,7 @@ public:
              m_sim.physics_manager().contains("MultiPhase"));
 
         m_adv_op.reset(new AdvectionOp<PDE, Scheme>(
-            m_fields, m_sim.has_overset(), variable_density,
+            m_fields, need_solver_mask, variable_density,
             m_sim.has_mesh_mapping()));
     }
 
@@ -113,6 +118,20 @@ public:
     void compute_diffusion_term(const FieldState fstate) override
     {
         if (PDE::has_diffusion) {
+            // apply interface condition for thin-body actuator
+            const bool thinbody_actuator = m_repo.field_exists("mom_sum");
+            if (thinbody_actuator) {
+                auto& U = m_repo.get_field("velocity");
+                for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
+                    for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
+                         mfi.isValid(); ++mfi) {
+                        amr_wind::thinbody::zero_adjacent_cell_vel(
+                            m_repo, lev, mfi,
+                            U(lev).array(mfi));
+                    }
+                }
+            }
+
             BL_PROFILE(
                 "amr-wind::" + this->identifier() + "::compute_diffusion_term");
             m_bc_op.apply_bcs(fstate);
@@ -153,6 +172,20 @@ public:
     void solve(const amrex::Real dt) override
     {
         if (PDE::has_diffusion) {
+            // apply interface condition for thin-body actuator
+            const bool thinbody_actuator = m_repo.field_exists("mom_sum");
+            if (thinbody_actuator) {
+                auto& U = m_repo.get_field("velocity");
+                for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
+                    for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
+                         mfi.isValid(); ++mfi) {
+                        amr_wind::thinbody::zero_adjacent_cell_vel(
+                            m_repo, lev, mfi,
+                            U(lev).array(mfi));
+                    }
+                }
+            }
+
             BL_PROFILE("amr-wind::" + this->identifier() + "::linsys_solve");
             m_bc_op.apply_bcs(FieldState::New);
             m_diff_op->linsys_solve(dt);
