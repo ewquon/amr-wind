@@ -56,7 +56,10 @@ public:
     //! Perform initialization actions after the mesh is created
     void initialize() override
     {
-        const bool need_solver_mask = m_sim.has_overset() || m_repo.field_exists("mom_sum");
+        const bool need_solver_mask = m_sim.has_overset(); // || m_repo.field_exists("mom_sum");
+        amrex::Print() << "Initialize PDESystem " << identifier()
+            << " (need_solver_mask=" << need_solver_mask << ")"
+            << std::endl;
 
         if (PDE::has_diffusion) {
             BL_PROFILE("amr-wind::" + this->identifier() + "::initialize");
@@ -121,7 +124,7 @@ public:
             // apply interface condition for thin-body actuator
             const bool thinbody_actuator = m_repo.field_exists("mom_sum");
             if (thinbody_actuator) {
-                auto& U = m_repo.get_field("velocity");
+                auto& U = m_repo.get_field("velocity").state(fstate);
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
                          mfi.isValid(); ++mfi) {
@@ -129,6 +132,7 @@ public:
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
+                    U(lev).FillBoundary();
                 }
             }
 
@@ -183,6 +187,7 @@ public:
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
+                    U(lev).FillBoundary();
                 }
             }
 

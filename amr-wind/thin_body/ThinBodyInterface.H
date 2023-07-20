@@ -30,24 +30,45 @@ static inline void zero_adjacent_cell_vel(
 
     amrex::ParallelFor(bx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
+            // Note: We should only set vel_arr(i,j,k,n) and not the ghost
+            // cells within this ParallelFor, otherwise FillBoundary will not
+            // work as expected.
+
             if (xf_mask_arr(i,j,k)==0) {
-                amrex::Real uerr = 0.5*(vel_arr(i,j,k,0)+vel_arr(i-1,j  ,k  ,0));
-                vel_arr(i  ,j  ,k  ,0) -= uerr;
-                vel_arr(i-1,j  ,k  ,0) -= uerr;
+                amrex::Real uerr = 0.5*(vel_arr(i-1,j,k,0)
+                                       +vel_arr(i  ,j,k,0));
+                vel_arr(i,j,k,0) -= uerr;
             }
+            else if (xf_mask_arr(i+1,j,k)==0) {
+                amrex::Real uerr = 0.5*(vel_arr(i  ,j,k,0)
+                                       +vel_arr(i+1,j,k,0));
+                vel_arr(i,j,k,0) -= uerr;
+            }
+
             if (yf_mask_arr(i,j,k)==0) {
-                amrex::Real verr = 0.5*(vel_arr(i,j,k,1)+vel_arr(i  ,j-1,k  ,1));
-                vel_arr(i  ,j  ,k  ,1) -= verr;
-                vel_arr(i  ,j-1,k  ,1) -= verr;
+                amrex::Real verr = 0.5*(vel_arr(i,j-1,k,1)
+                                       +vel_arr(i,j  ,k,1));
+                vel_arr(i,j,k,1) -= verr;
             }
+            else if (yf_mask_arr(i,j+1,k)==0) {
+                amrex::Real verr = 0.5*(vel_arr(i,j  ,k,1)
+                                       +vel_arr(i,j+1,k,1));
+                vel_arr(i,j,k,1) -= verr;
+            }
+
             if (zf_mask_arr(i,j,k)==0) {
-                amrex::Real werr = 0.5*(vel_arr(i,j,k,2)+vel_arr(i  ,j  ,k-1,2));
+                amrex::Real werr = 0.5*(vel_arr(i,j,k-1,2)
+                                       +vel_arr(i,j,k  ,2));
+                vel_arr(i,j,k,2) -= werr;
+            }
+            else if (zf_mask_arr(i,j,k+1)==0) {
+                amrex::Real werr = 0.5*(vel_arr(i,j,k  ,2)
+                                       +vel_arr(i,j,k+1,2));
+                vel_arr(i,j,k,2) -= werr;
                 //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<")"
                 //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","<< plo[1]+(j+0.5)*dx[1] <<","<< plo[2]+      k*dx[2] <<")" // zface is staggered in k
                 //    << " to correct wface=" << werr
                 //    << std::endl;
-                vel_arr(i  ,j  ,k  ,2) -= werr;
-                vel_arr(i  ,j  ,k-1,2) -= werr;
             }
         });
 }
