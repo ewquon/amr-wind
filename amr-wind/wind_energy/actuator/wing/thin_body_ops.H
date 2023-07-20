@@ -296,7 +296,7 @@ struct ComputeForceOp<
 
         const bool DEBUG = false;
 
-        amrex::Real dt = data.sim().time().deltaT();
+        //amrex::Real dt = data.sim().time().deltaT();
 
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
@@ -307,16 +307,15 @@ struct ComputeForceOp<
             // Set spanwise component to zero to get a pure 2D velocity
             wvel.y() = 0.0;
 
-            if (DEBUG && data.info().is_root_proc)
+            if (DEBUG && data.info().is_root_proc) {
+                //if ((data.info().id == 0) && (ip == 0))
                 amrex::Print(amrex::Print::AllProcs)
                     << "[ComputeForceOp] actuator " << data.info().id
-                    << " vel pt " << ip << " at "
-                    << grid.pos[ip].x() << " "
-                    << grid.pos[ip].y() << " "
-                    << grid.pos[ip].z() << " : "
-                    << wvel.x() << " "
-                    << wvel.y() << " "
-                    << wvel.z() << std::endl;
+                    << " pt "<<ip<<" at ("<<grid.pos[ip].x()<<","<<grid.pos[ip].y()<<","<<grid.pos[ip].z()<< ")"
+                    << " wvel=("<<wvel.x()<<","<<wvel.y()<<","<<wvel.z()<<")"
+                    << " force=("<<grid.force[ip].x()<<","<<grid.force[ip].y()<<","<<grid.force[ip].z()<<")"
+                    << std::endl;
+            }
 
             // Compute force on fluid to achieve no penetration
             // assuming unit density: f ~ dv/dt
@@ -347,7 +346,9 @@ struct ComputeForceOp<
             total_lift += lift;
             total_drag += drag;
 
-            // Body force should not be needed with new interface treatment
+            // Body force should _not_ be needed with new interface treatment
+            // Note: body force in actuator output will need to be
+            // reconstructed from cl, cd, vrel, and aoa
             grid.force[ip] = amr_wind::vs::Vector::zero();
         }
 
