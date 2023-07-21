@@ -7,7 +7,7 @@
 #include "amr-wind/equation_systems/vof/vof_momentum_flux.H"
 
 #include "amr-wind/thin_body/ThinBodyCV.H"
-//#include "amr-wind/thin_body/ThinBodyInterface.H"
+#include "amr-wind/thin_body/ThinBodyInterface.H"
 
 #include "AMReX_MultiFabUtil.H"
 #include "hydro_MacProjector.H"
@@ -51,7 +51,6 @@ private:
     std::unique_ptr<Hydro::MacProjector> m_mac_proj;
     MLMGOptions m_options;
     bool m_has_overset{false};
-    bool m_need_solver_mask{false};
     bool m_need_init{true};
     bool m_variable_density{false};
     bool m_mesh_mapping{false};
@@ -141,7 +140,8 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         const auto& dof_field = fields.field.state(fstate);
         auto bcrec_device = dof_field.bcrec_device();
 
-        //const bool thinbody_actuator = repo.field_exists("mom_sum");
+        // TODO create physics manager option for thin body
+        const bool thinbody_actuator = repo.field_exists("mom_sum");
 
         for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
             u_mac(lev).setBndry(0.0);
@@ -292,7 +292,6 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 amrex::Abort("Invalid godunov scheme");
             }
 
-            /*
             if (thinbody_actuator) {
                 for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
                      mfi.isValid(); ++mfi) {
@@ -303,7 +302,6 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         w_mac(lev).array(mfi));
                 }
             }
-            */
         }
 
         if (m_verbose > 2) {
