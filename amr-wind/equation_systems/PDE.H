@@ -56,6 +56,12 @@ public:
     //! Perform initialization actions after the mesh is created
     void initialize() override
     {
+        // This flag will add blanking to the MAC-projection and velocity solves
+        //
+        // The commented part will turn this feature on for the thin-body
+        // actuator, but it is unclear if blanking the two layers of cells
+        // suurrounding a no-penetration interface (given a zero-thicknkess
+        // body) is necessary, effective, or appropriate.
         const bool need_solver_mask = m_sim.has_overset(); // || m_repo.field_exists("mom_sum");
         amrex::Print() << "Initialize PDESystem " << identifier()
             << " (need_solver_mask=" << need_solver_mask << ")"
@@ -82,7 +88,7 @@ public:
     //! Perform update actions after a regrid is performed
     void post_regrid_actions() override
     {
-        const bool need_solver_mask = m_sim.has_overset() || m_repo.field_exists("mom_sum");
+        const bool need_solver_mask = m_sim.has_overset(); // || m_repo.field_exists("mom_sum");
 
         if (PDE::has_diffusion) {
             BL_PROFILE(
@@ -124,6 +130,7 @@ public:
             // apply interface condition for thin-body actuator
             const bool thinbody_actuator = m_repo.field_exists("mom_sum");
             if (thinbody_actuator) {
+                const auto& geom = m_repo.mesh().Geom();
                 auto& U = m_repo.get_field("velocity").state(fstate);
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
@@ -132,7 +139,7 @@ public:
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
-                    U(lev).FillBoundary();
+                    U(lev).FillBoundary(geom[lev].periodicity());
                 }
             }
 
@@ -179,6 +186,7 @@ public:
             // apply interface condition for thin-body actuator
             const bool thinbody_actuator = m_repo.field_exists("mom_sum");
             if (thinbody_actuator) {
+                const auto& geom = m_repo.mesh().Geom();
                 auto& U = m_repo.get_field("velocity");
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
@@ -187,7 +195,7 @@ public:
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
-                    U(lev).FillBoundary();
+                    U(lev).FillBoundary(geom[lev].periodicity());
                 }
             }
 

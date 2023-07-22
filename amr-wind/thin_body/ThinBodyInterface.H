@@ -17,10 +17,12 @@ static inline void zero_adjacent_cell_vel(
     const auto& xface_mask = repo.get_int_field("mom_xface_mask");
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
     const auto& zface_mask = repo.get_int_field("mom_zface_mask");
+    const auto& mask_cell = repo.get_int_field("mask_cell");
 
-    const auto& xf_mask_arr  = xface_mask(lev).const_array(mfi);
-    const auto& yf_mask_arr  = yface_mask(lev).const_array(mfi);
-    const auto& zf_mask_arr  = zface_mask(lev).const_array(mfi);
+    const auto& xf_mask_arr = xface_mask(lev).const_array(mfi);
+    const auto& yf_mask_arr = yface_mask(lev).const_array(mfi);
+    const auto& zf_mask_arr = zface_mask(lev).const_array(mfi);
+    const auto& mc_arr = mask_cell(lev).const_array(mfi);
 
     //const auto& geom = repo.mesh().Geom();
     //const auto plo = geom[lev].ProbLoArray();
@@ -73,6 +75,7 @@ static inline void zero_adjacent_cell_vel(
         });
 }
 
+/* Sets velocities on masked faces to 0 */
 static inline void zero_surface_face_vel(
     const FieldRepo& repo,
     int lev,
@@ -85,9 +88,9 @@ static inline void zero_surface_face_vel(
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
     const auto& zface_mask = repo.get_int_field("mom_zface_mask");
 
-    const auto& xf_mask_arr  = xface_mask(lev).const_array(mfi);
-    const auto& yf_mask_arr  = yface_mask(lev).const_array(mfi);
-    const auto& zf_mask_arr  = zface_mask(lev).const_array(mfi);
+    const auto& xf_mask_arr = xface_mask(lev).const_array(mfi);
+    const auto& yf_mask_arr = yface_mask(lev).const_array(mfi);
+    const auto& zf_mask_arr = zface_mask(lev).const_array(mfi);
 
     const auto& xbx = mfi.tilebox(amrex::IntVect(1,0,0));
     const auto& ybx = mfi.tilebox(amrex::IntVect(0,1,0));

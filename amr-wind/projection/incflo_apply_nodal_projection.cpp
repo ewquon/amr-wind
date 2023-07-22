@@ -5,6 +5,7 @@
 #include "amr-wind/utilities/console_io.H"
 #include "amr-wind/core/field_ops.H"
 #include "amr-wind/wind_energy/ABL.H"
+#include "amr-wind/thin_body/ThinBodyInterface.H"
 
 using namespace amrex;
 
@@ -287,6 +288,23 @@ void incflo::ApplyProjection(
     auto bclo = get_projection_bc(Orientation::low);
     auto bchi = get_projection_bc(Orientation::high);
 
+    bool has_thinbody = repo().field_exists("mom_sum");
+    if (has_thinbody) {
+        AMREX_ALWAYS_ASSERT(!incremental); // untested
+
+        for (int lev = 0; lev <= finest_level; ++lev) {
+            // need adjacent cell velocities from ghost cells
+            velocity(lev).FillBoundary(geom[lev].periodicity());
+
+//            for (amrex::MFIter mfi(velocity(lev), amrex::TilingIfNotGPU());
+//                 mfi.isValid(); ++mfi) {
+//                amr_wind::thinbody::zero_adjacent_cell_vel(
+//                    m_repo, lev, mfi,
+//                    velocity(lev).array(mfi));
+//            }
+        }
+    }
+
     Vector<MultiFab*> vel;
     for (int lev = 0; lev <= finest_level; ++lev) {
         vel.push_back(&(velocity(lev)));
@@ -321,8 +339,8 @@ void incflo::ApplyProjection(
         auto div_vel_rhs =
             sim().repo().create_scratch_field(1, 0, amr_wind::FieldLoc::NODE);
         nodal_projector->computeRHS(div_vel_rhs->vec_ptrs(), vel, {}, {});
-        // Mask the righ-hand side of the Poisson solve for the nodes inside the
-        // body
+        // Mask the right-hand side of the Poisson solve for the nodes inside
+        // the body
         const auto& imask_node = repo().get_int_field("mask_node");
         for (int lev = 0; lev <= finest_level; ++lev) {
             amrex::MultiFab::Multiply(
@@ -333,8 +351,7 @@ void incflo::ApplyProjection(
     }
 
     // Setup masking for overset simulations
-    const bool need_solver_mask = sim().has_overset() || repo().field_exists("mom_sum");
-    if (need_solver_mask) {
+    if (sim().has_overset()) {
         auto& linop = nodal_projector->getLinOp();
         const auto& imask_node = repo().get_int_field("mask_node");
         for (int lev = 0; lev <= finest_level; ++lev) {
@@ -342,7 +359,7 @@ void incflo::ApplyProjection(
         }
     }
 
-    if (need_solver_mask) {
+    if (sim().has_overset()) {
         auto phif = m_repo.create_scratch_field(1, 1, amr_wind::FieldLoc::NODE);
         if (incremental) {
             for (int lev = 0; lev <= finestLevel(); ++lev) {

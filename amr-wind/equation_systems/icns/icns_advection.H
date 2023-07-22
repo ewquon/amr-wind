@@ -141,7 +141,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
         auto bcrec_device = dof_field.bcrec_device();
 
         // TODO create physics manager option for thin body
-        const bool thinbody_actuator = repo.field_exists("mom_sum");
+        const bool has_thinbody = repo.field_exists("mom_sum");
 
         for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
             u_mac(lev).setBndry(0.0);
@@ -292,7 +292,8 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 amrex::Abort("Invalid godunov scheme");
             }
 
-            if (thinbody_actuator) {
+            /*
+            if (has_thinbody) {
                 for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
                      mfi.isValid(); ++mfi) {
                     thinbody::zero_surface_face_vel(
@@ -302,6 +303,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         w_mac(lev).array(mfi));
                 }
             }
+            */
         }
 
         if (m_verbose > 2) {
@@ -356,7 +358,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
             repo.get_field("density").state(amr_wind::FieldState::Old);
 
         const bool mphase_vof = repo.field_exists("vof");
-        const bool thinbody_actuator = repo.field_exists("mom_sum");
+        const bool has_thinbody = repo.field_exists("mom_sum");
 
         //
         // Advect momentum eqns
@@ -489,7 +491,7 @@ struct AdvectionOp<ICNS, fvm::Godunov>
 
         // Update surface force distribution based on control volume analysis,
         // which will be sampled and stored in the ThinBody actuator
-        if (thinbody_actuator) {
+        if (has_thinbody) {
             auto& cvsum = repo.get_field("mom_sum");
 
             for (int lev = 0; lev < repo.num_active_levels(); ++lev) {
