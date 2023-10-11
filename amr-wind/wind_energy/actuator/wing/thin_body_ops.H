@@ -117,14 +117,14 @@ struct ReadInputsOp<ThinBody, ActSrcLine>
         auto& wdata = data.meta();
         auto& info = data.info();
         pp.get("num_span_points", wdata.num_pts);
-        pp.get("num_chord_points", wdata.num_chord_pts);
+        // pp.get("num_chord_points", wdata.num_chord_pts);
         pp.query("actuators_at_nodes", wdata.act_nodes);
         pp.get("start", wdata.start);
         pp.get("end", wdata.end);
         pp.query("gain", wdata.gain);
         pp.query("epsilon", wdata.eps_inp);
         pp.query("epsilon_chord", wdata.epsilon_chord);
-        pp.get("pitch", wdata.pitch);
+        pp.query("pitch", wdata.pitch);
         pp.queryarr("span_locs", wdata.span_locs);
         pp.queryarr("chord", wdata.chord_inp);
 

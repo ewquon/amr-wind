@@ -292,7 +292,6 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                 amrex::Abort("Invalid godunov scheme");
             }
 
-            /*
             if (has_thinbody) {
                 for (amrex::MFIter mfi(dof_field(lev), amrex::TilingIfNotGPU());
                      mfi.isValid(); ++mfi) {
@@ -301,9 +300,16 @@ struct AdvectionOp<ICNS, fvm::Godunov>
                         u_mac(lev).array(mfi),
                         v_mac(lev).array(mfi),
                         w_mac(lev).array(mfi));
+//                    thinbody::save_blanked_face_vel(
+//                        repo, lev, mfi,
+//                        u_mac(lev).const_array(mfi),
+//                        v_mac(lev).const_array(mfi),
+//                        w_mac(lev).const_array(mfi),
+//                        (*u_face)(lev).array(mfi),
+//                        (*v_face)(lev).array(mfi),
+//                        (*w_face)(lev).array(mfi));
                 }
             }
-            */
         }
 
         if (m_verbose > 2) {
