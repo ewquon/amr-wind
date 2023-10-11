@@ -490,6 +490,62 @@ void ActuatorContainer::mark_surface_faces(
         mcfab.SumBoundary(geom.periodicity());
         mnfab.SumBoundary(geom.periodicity());
 
+        for (ParIterType pti(*this, lev); pti.isValid(); ++pti) {
+            const int np = pti.numParticles();
+            auto* pstruct = pti.GetArrayOfStructs()().data();
+            const auto& mc_arr = mcfab.array(pti);
+            const auto& mn_arr = mnfab.array(pti);
+
+            amrex::ParallelFor(np, [=] AMREX_GPU_DEVICE(const int ip) noexcept {
+                auto& pp = pstruct[ip];
+                // Determine offsets _from the nearest node_
+                const amrex::Real x = (pp.pos(0) - plo[0]) * dxi[0];
+                const amrex::Real y = (pp.pos(1) - plo[1]) * dxi[1];
+                const amrex::Real z = (pp.pos(2) - plo[2]) * dxi[2];
+
+                // Index of the low corner
+                constexpr amrex::Real domain_eps = 1.0e-6;
+                const int i = static_cast<int>(std::floor(x + domain_eps));
+                const int j = static_cast<int>(std::floor(y + domain_eps));
+                const int k = static_cast<int>(std::floor(z + domain_eps));
+
+                // If grids overlap at more than one edge or face, SumBoundary
+                // will end up with mask values < -1. Need to make sure fringes
+                // are exactly -1 at this point, otherwise the resulting mask
+                // will have unexpected or undefined values.
+                if (mc_arr(i  ,j  ,k  ) < -1) mc_arr(i  ,j  ,k  ) = -1;
+                if (mc_arr(i-1,j  ,k  ) < -1) mc_arr(i-1,j  ,k  ) = -1;
+                if (mc_arr(i  ,j-1,k  ) < -1) mc_arr(i  ,j-1,k  ) = -1;
+                if (mc_arr(i  ,j  ,k-1) < -1) mc_arr(i  ,j  ,k-1) = -1;
+                if (mn_arr(i  ,j  ,k  ) < -1) mn_arr(i  ,j  ,k  ) = -1;
+                if (mn_arr(i  ,j+1,k  ) < -1) mn_arr(i  ,j+1,k  ) = -1;
+                if (mn_arr(i  ,j  ,k+1) < -1) mn_arr(i  ,j  ,k+1) = -1;
+                if (mn_arr(i  ,j+1,k+1) < -1) mn_arr(i  ,j+1,k+1) = -1;
+                if (mn_arr(i+1,j  ,k  ) < -1) mn_arr(i+1,j  ,k  ) = -1;
+                if (mn_arr(i  ,j  ,k+1) < -1) mn_arr(i  ,j  ,k+1) = -1;
+                if (mn_arr(i+1,j  ,k+1) < -1) mn_arr(i+1,j  ,k+1) = -1;
+                if (mn_arr(i+1,j  ,k  ) < -1) mn_arr(i+1,j  ,k  ) = -1;
+                if (mn_arr(i  ,j+1,k  ) < -1) mn_arr(i  ,j+1,k  ) = -1;
+                if (mn_arr(i+1,j+1,k  ) < -1) mn_arr(i+1,j+1,k  ) = -1;
+
+                if ((mc_arr(i  ,j  ,k  ) > 0) ||
+                    (mc_arr(i-1,j  ,k  ) > 0) ||
+                    (mc_arr(i  ,j-1,k  ) > 0) ||
+                    (mc_arr(i  ,j  ,k-1) > 0) ||
+                    (mn_arr(i  ,j  ,k  ) > 0) ||
+                    (mn_arr(i  ,j+1,k  ) > 0) ||
+                    (mn_arr(i  ,j  ,k+1) > 0) ||
+                    (mn_arr(i  ,j+1,k+1) > 0) ||
+                    (mn_arr(i+1,j  ,k  ) > 0) ||
+                    (mn_arr(i  ,j  ,k+1) > 0) ||
+                    (mn_arr(i+1,j  ,k+1) > 0) ||
+                    (mn_arr(i+1,j  ,k  ) > 0) ||
+                    (mn_arr(i  ,j+1,k  ) > 0) ||
+                    (mn_arr(i+1,j+1,k  ) > 0))
+                    amrex::Abort("Mask should be either -1 or 0 at this point");
+            });
+        }
+
         // Now all surface faces (and adjacent cells/nodes) will be -1, so add
         // 1 to have the masks be:
         //   0 on (and adjacent to) surface faces
