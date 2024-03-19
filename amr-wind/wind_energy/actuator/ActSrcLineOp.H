@@ -110,20 +110,20 @@ void ActSrcOp<ActTrait, ActSrcLine>::operator()(
                 problo[2] + (k + 0.5) * dx[2],
             };
 
-        amrex::Real src_force[AMREX_SPACEDIM]{0.0, 0.0, 0.0};
-        for (int ip = 0; ip < npts; ++ip) {
-            // Put force at n+1/2 location for Godunov
-            constexpr amrex::Real wt = 0.5;
-            const auto pos_ip = wt * pos[ip] + (1.0 - wt) * opos[ip];
-            const auto dist = cc - pos_ip;
-            const auto dist_local = tmat[ip] & dist;
-            const auto gauss_fac = utils::gaussian3d(dist_local, eps[ip]);
-            const auto& pforce = force[ip];
+            amrex::Real src_force[AMREX_SPACEDIM]{0.0, 0.0, 0.0};
+            for (int ip = 0; ip < npts; ++ip) {
+                // Put force at n+1/2 location for Godunov
+                constexpr amrex::Real wt = 0.5;
+                const auto pos_ip = wt * pos[ip] + (1.0 - wt) * opos[ip];
+                const auto dist = cc - pos_ip;
+                const auto dist_local = tmat[ip] & dist;
+                const auto gauss_fac = utils::gaussian3d(dist_local, eps[ip]);
+                const auto& pforce = force[ip];
 
-                if (std::abs(dist_local.z()) > 1e-8) continue;
+                    if (std::abs(dist_local.z()) > 1e-8) continue;
 
-                src_force[0] += gauss_fac * pforce.x();
-                src_force[1] += gauss_fac * pforce.y();
+                    src_force[0] += gauss_fac * pforce.x();
+                    src_force[1] += gauss_fac * pforce.y();
             }
 
             sarr(i, j, k, 0) += src_force[0];
@@ -142,7 +142,10 @@ void ActSrcOp<ActTrait, ActSrcLine>::operator()(
 
             amrex::Real src_force[AMREX_SPACEDIM]{0.0, 0.0, 0.0};
             for (int ip = 0; ip < npts; ++ip) {
-                const auto dist = cc - pos[ip];
+                // Put force at n+1/2 location for Godunov
+                constexpr amrex::Real wt = 0.5;
+                const auto pos_ip = wt * pos[ip] + (1.0 - wt) * opos[ip];
+                const auto dist = cc - pos_ip;
                 const auto dist_local = tmat[ip] & dist;
                 const auto gauss_fac = utils::gaussian3d(dist_local, eps[ip]);
                 const auto& pforce = force[ip];
