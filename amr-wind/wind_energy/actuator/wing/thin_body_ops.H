@@ -219,7 +219,13 @@ struct InitDataOp<ThinBody, ActSrcLine>
         data.sim().repo().declare_int_field("mom_yface_mask",1,0,1,amr_wind::FieldLoc::YFACE);
         data.sim().repo().declare_int_field("mom_zface_mask",1,0,1,amr_wind::FieldLoc::ZFACE);
 
+        // Create field to hold the normal velocity corrections for cells
+        // adjacent to the surface.
+        data.sim().repo().declare_field("norm_vel_corr",3,0,1,amr_wind::FieldLoc::CELL);
+
         // Create masks for overset-like solves
+        // TODO: Make sure there's no conflict with existing fields in overset
+        // infrastructure
         int nghost = data.sim().pde_manager().num_ghost_state();
         data.sim().repo().declare_int_field("mask_cell",1,nghost);
         data.sim().repo().declare_int_field("mask_node",1,nghost,1,FieldLoc::NODE);

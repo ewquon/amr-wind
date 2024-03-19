@@ -18,11 +18,18 @@ static inline void zero_adjacent_cell_vel(
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
     const auto& zface_mask = repo.get_int_field("mom_zface_mask");
     const auto& mask_cell = repo.get_int_field("mask_cell");
+    auto& vel_corr = repo.get_field("norm_vel_corr");
 
     const auto& xf_mask_arr = xface_mask(lev).const_array(mfi);
     const auto& yf_mask_arr = yface_mask(lev).const_array(mfi);
     const auto& zf_mask_arr = zface_mask(lev).const_array(mfi);
     const auto& mc_arr = mask_cell(lev).const_array(mfi);
+
+    // We cannot modify vel_arr in place because it needs to be used twice
+    // (once per adjacent cell) for each zero-flux face to calculate the
+    // velocity error in the normal direction.
+    // TODO: Create a temporary MultiFab instead?
+    const auto& vel_corr_arr = vel_corr(lev).array(mfi);
 
     //const auto& geom = repo.mesh().Geom();
     //const auto plo = geom[lev].ProbLoArray();
@@ -37,39 +44,47 @@ static inline void zero_adjacent_cell_vel(
             // work as expected.
 
             if (xf_mask_arr(i,j,k)==0) {
-                amrex::Real uerr = 0.5*(vel_arr(i-1,j,k,0)
-                                       +vel_arr(i  ,j,k,0));
-                vel_arr(i,j,k,0) -= uerr;
+                // cell is on +x side of thin body, surface is at low face
+                vel_corr_arr(i,j,k,0) -= 0.5*(vel_arr(i-1,j,k,0)
+                                             +vel_arr(i  ,j,k,0));
             }
             else if (xf_mask_arr(i+1,j,k)==0) {
-                amrex::Real uerr = 0.5*(vel_arr(i  ,j,k,0)
-                                       +vel_arr(i+1,j,k,0));
-                vel_arr(i,j,k,0) -= uerr;
+                // cell is on -x side of thin body, surface is at high face
+                vel_corr_arr(i,j,k,0) -= 0.5*(vel_arr(i  ,j,k,0)
+                                             +vel_arr(i+1,j,k,0));
             }
 
             if (yf_mask_arr(i,j,k)==0) {
-                amrex::Real verr = 0.5*(vel_arr(i,j-1,k,1)
-                                       +vel_arr(i,j  ,k,1));
-                vel_arr(i,j,k,1) -= verr;
+                // cell is on +y side of thin body, surface is at low face
+                vel_corr_arr(i,j,k,1) -= 0.5*(vel_arr(i,j-1,k,1)
+                                             +vel_arr(i,j  ,k,1));
             }
             else if (yf_mask_arr(i,j+1,k)==0) {
-                amrex::Real verr = 0.5*(vel_arr(i,j  ,k,1)
-                                       +vel_arr(i,j+1,k,1));
-                vel_arr(i,j,k,1) -= verr;
+                // cell is on -y side of thin body, surface is at high face
+                vel_corr_arr(i,j,k,1) -= 0.5*(vel_arr(i,j  ,k,1)
+                                             +vel_arr(i,j+1,k,1));
             }
 
             if (zf_mask_arr(i,j,k)==0) {
-                amrex::Real werr = 0.5*(vel_arr(i,j,k-1,2)
-                                       +vel_arr(i,j,k  ,2));
-                vel_arr(i,j,k,2) -= werr;
+                // cell is on +z side of thin body, surface is at low face
+                vel_corr_arr(i,j,k,2) -= 0.5*(vel_arr(i,j,k-1,2)
+                                             +vel_arr(i,j,k  ,2));
+                //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<" at k)"
+                //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","
+                //                << plo[1]+(j+0.5)*dx[1] <<","
+                //                << plo[2]+      k*dx[2] <<")" // zface is staggered in k
+                //    << " to correct wface=" << vel_corr_arr(i,j,k,2)
+                //    << std::endl;
             }
             else if (zf_mask_arr(i,j,k+1)==0) {
-                amrex::Real werr = 0.5*(vel_arr(i,j,k  ,2)
-                                       +vel_arr(i,j,k+1,2));
-                vel_arr(i,j,k,2) -= werr;
-                //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<")"
-                //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","<< plo[1]+(j+0.5)*dx[1] <<","<< plo[2]+      k*dx[2] <<")" // zface is staggered in k
-                //    << " to correct wface=" << werr
+                // cell is on -z side of thin body, surface is at high face
+                vel_corr_arr(i,j,k,2) -= 0.5*(vel_arr(i,j,k  ,2)
+                                             +vel_arr(i,j,k+1,2));
+                //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<" at k+1)"
+                //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","<<
+                //                   plo[1]+(j+0.5)*dx[1] <<","<<
+                //                   plo[2]+(k+1  )*dx[2] <<")" // zface is staggered in k
+                //    << " to correct wface=" << vel_corr_arr(i,j,k,2)
                 //    << std::endl;
             }
         });

@@ -133,18 +133,21 @@ public:
     void compute_diffusion_term(const FieldState fstate) override
     {
         if (PDE::has_diffusion) {
-            // apply interface condition for thin-body actuator
-            const bool thinbody_actuator = m_repo.field_exists("mom_sum");
-            if (thinbody_actuator) {
+            // apply interface condition for thin body
+            const bool has_thinbody = m_repo.field_exists("mom_sum");
+            if (has_thinbody) {
                 const auto& geom = m_repo.mesh().Geom();
                 auto& U = m_repo.get_field("velocity").state(fstate);
+                auto& Ucorr = m_repo.get_field("norm_vel_corr");
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
+                    Ucorr(lev).setVal(0.0);
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
                          mfi.isValid(); ++mfi) {
                         amr_wind::thinbody::zero_adjacent_cell_vel(
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
+                    amrex::MultiFab::Add(U(lev), Ucorr(lev), 0, 0, 3, 0);
                     U(lev).FillBoundary(geom[lev].periodicity());
                 }
             }
@@ -189,18 +192,21 @@ public:
     void solve(const amrex::Real dt) override
     {
         if (PDE::has_diffusion) {
-            // apply interface condition for thin-body actuator
-            const bool thinbody_actuator = m_repo.field_exists("mom_sum");
-            if (thinbody_actuator) {
+            // apply interface condition for thin body
+            const bool has_thinbody = m_repo.field_exists("mom_sum");
+            if (has_thinbody) {
                 const auto& geom = m_repo.mesh().Geom();
                 auto& U = m_repo.get_field("velocity").state(FieldState::New);
+                auto& Ucorr = m_repo.get_field("norm_vel_corr");
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
+                    Ucorr(lev).setVal(0.0);
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
                          mfi.isValid(); ++mfi) {
                         amr_wind::thinbody::zero_adjacent_cell_vel(
                             m_repo, lev, mfi,
                             U(lev).array(mfi));
                     }
+                    amrex::MultiFab::Add(U(lev), Ucorr(lev), 0, 0, 3, 0);
                     U(lev).FillBoundary(geom[lev].periodicity());
                 }
             }
