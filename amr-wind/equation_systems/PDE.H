@@ -193,7 +193,7 @@ public:
             const bool thinbody_actuator = m_repo.field_exists("mom_sum");
             if (thinbody_actuator) {
                 const auto& geom = m_repo.mesh().Geom();
-                auto& U = m_repo.get_field("velocity");
+                auto& U = m_repo.get_field("velocity").state(FieldState::New);
                 for (int lev = 0; lev < m_repo.num_active_levels(); ++lev) {
                     for (amrex::MFIter mfi(U(lev), amrex::TilingIfNotGPU());
                          mfi.isValid(); ++mfi) {
