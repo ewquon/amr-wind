@@ -4,6 +4,21 @@
 #include "AMReX_REAL.H"
 #include "AMReX_GpuQualifiers.H"
 #include "AMReX_Extension.H"
+#include <algorithm>
+#include <cmath>
+
+namespace {
+AMREX_FORCE_INLINE amrex::Real get_enforced_dt_for_output(
+    const amrex::Real dt,
+    const amrex::Real cur_time,
+    const amrex::Real interval,
+    const amrex::Real tol)
+{
+    // Tolerance for being slightly under is relative to requested interval
+    return std::min(
+        dt, (std::floor(cur_time / interval + tol) + 1) * interval - cur_time);
+}
+} // namespace
 
 namespace amr_wind {
 
@@ -158,6 +173,33 @@ private:
     //! Initial reduction in timestep size for startup
     amrex::Real m_init_shrink{0.1};
 
+    //! Maximum growth of dt between timesteps
+    amrex::Real m_dt_growth{0.1};
+
+    //! Time interval for writing checkpoint/restart files
+    amrex::Real m_chkpt_t_interval{-1.0};
+
+    //! Time delay for checkpoint/restart output
+    amrex::Real m_chkpt_t_delay{0.0};
+
+    //! Relative (to dt) tolerance for checkpoint time interval output
+    amrex::Real m_chkpt_t_tol{1e-8};
+
+    //! Relative (to chkpt_t_interval) tolerance for enforcing dt
+    amrex::Real m_force_chkpt_tol{1e-3};
+
+    //! Time interval for plot file output
+    amrex::Real m_plt_t_interval{-1.0};
+
+    //! Time delay for plot file output
+    amrex::Real m_plt_t_delay{0.0};
+
+    //! Relative (to dt) tolerance for plot time interval output
+    amrex::Real m_plt_t_tol{1e-8};
+
+    //! Relative (to plt_t_interval) tolerance for enforcing dt
+    amrex::Real m_force_plt_tol{1e-3};
+
     //! Counter for the number of timesteps since start of simulation
     int m_time_index{0};
 
@@ -167,7 +209,7 @@ private:
     //! Initial starting time index for generating checkpoint files
     int m_chkpt_start_index{0};
 
-    //! Initial starting time index for generating ouput files
+    //! Initial starting time index for generating output files
     int m_plt_start_index{0};
 
     //! Initial starting time index for regriding
@@ -176,11 +218,18 @@ private:
     //! Maximum timesteps for simulation
     int m_stop_time_index{-1};
 
-    //! Time interval for plot file output
+    //! Time step interval for writing checkpoint/restart files
+    int m_chkpt_interval{-1};
+
+    //! Time step delay for checkpoint/restart output
+    //! (this means that output only happens after the delay)
+    int m_chkpt_delay{0};
+
+    //! Time step interval for plot file output
     int m_plt_interval{-1};
 
-    //! Time interval for writing checkpoint/restart files
-    int m_chkpt_interval{-1};
+    //! Time step delay for plot file output
+    int m_plt_delay{0};
 
     //! Time interval for regridding
     int m_regrid_interval{-1};
@@ -196,6 +245,12 @@ private:
 
     //! Flag indicating if forcing should be included in CFL calculation
     bool m_use_force_cfl{true};
+
+    //! Bool for if checkpoint time interval should be forced
+    bool m_force_chkpt_dt{false};
+
+    //! Bool for if plt time interval should be forced
+    bool m_force_plt_dt{false};
 };
 
 } // namespace amr_wind

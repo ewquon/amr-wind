@@ -33,6 +33,18 @@ void write_netcdf(
     const ActGrid& /*grid*/,
     const amrex::Real /*time*/);
 
+void refresh_wing_position(VecList& vpoints, VecList fpoints, const int npts);
+
+void new_wing_position_velocity(
+    VecList& points,
+    vs::Vector& vtr,
+    const int npts,
+    const amrex::Real tn,
+    const amrex::Real tnp1,
+    const std::string motion,
+    const amrex::Real period,
+    const vs::Vector svec);
+
 template <typename T>
 ComponentView make_component_view(typename T::DataType& data)
 {
@@ -77,7 +89,13 @@ struct UpdatePosOp<
         std::is_base_of<WingType, ActTrait>::value &&
         UseDefaultOp<ActTrait, ActSrcLine>::update_pos>::type>
 {
-    void operator()(typename ActTrait::DataType& /*unused*/) {}
+    void operator()(typename ActTrait::DataType& data)
+    {
+        // Put wing at current (time n) position from force points
+        auto& grid = data.grid();
+        const int npts = data.meta().num_pts;
+        actuator::wing::refresh_wing_position(grid.vel_pos, grid.pos, npts);
+    }
 };
 
 template <typename ActTrait>
@@ -115,25 +133,57 @@ struct ComputeForceOp<
         const auto& chord = wdata.chord;
         const auto& time = data.sim().time();
 
-        bool force_override = false;
-        if (wdata.force_override_inp.size() > 0) force_override = true;
+        // Move force points to location at n+1
+        // Also, get velocity of actuator from n to n+1
+        // (will be unchanged for "none" and "linear" motion)
+        actuator::wing::new_wing_position_velocity(
+            grid.pos, wdata.vel_tr, npts, time.current_time(), time.new_time(),
+            wdata.motion_type, wdata.s_period, wdata.s_vector);
 
+        // Calculate the local force using sampled velocity (at n)
         amrex::Real total_lift = 0.0;
         amrex::Real total_drag = 0.0;
         for (int ip = 0; ip < npts; ++ip) {
-            const auto& tmat = grid.orientation[ip];
-            // Effective velocity at the wing control point in local frame
-            auto wvel = tmat & grid.vel[ip];
-            // Set spanwise component to zero to get a pure 2D velocity
-            wvel.y() = 0.0;
 
-            const auto vmag = vs::mag(wvel);
-            const auto aoa = std::atan2(wvel.z(), wvel.x());
+            // Build the local reference frame
+            vs::Vector wspan = wdata.end - wdata.start;
 
+            // Use the global coord to orient the blade
+            // The default is for inflow in the x direction
+            auto blade_x = wdata.blade_x.unit();
+            auto blade_y = wspan.unit();
+            auto blade_z = (blade_x ^ blade_y).unit();
+            // Ensure orthogonality for new reference frame
+            blade_x = (blade_y ^ blade_z).unit();
+
+            // Wind vector is relative to actuator motion
+            vs::Vector windvector;
+            windvector[0] = (grid.vel[ip] - wdata.vel_tr) & blade_x;
+            windvector[1] = 0;
+            windvector[2] = (grid.vel[ip] - wdata.vel_tr) & blade_z;
+
+            const auto vmag = vs::mag(windvector);
+            const auto aoa = std::atan2(windvector[2], windvector[0]) +
+                             amr_wind::utils::radians(wdata.pitch);
+
+<<<<<<< HEAD
+=======
+            // Make up some Cl, Cd values
+            amrex::Real cl, cd;
+            aflookup(aoa, cl, cd);
+
+            // Assume unit chord
+            const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
+            const auto lift = qval * cl;
+            const auto drag = qval * cd;
+
+>>>>>>> 0bf6748359c51fa1beb2b74832ed09d680cd0285
             // Determine unit vector parallel and perpendicular to velocity
             // vector
-            const auto drag_dir = wvel.unit() & tmat;
-            const auto lift_dir = drag_dir ^ tmat.y();
+            // Directions
+            const auto drag_dir =
+                (blade_x * windvector.x() + blade_z * windvector.z()).unit();
+            const auto lift_dir = (drag_dir ^ blade_y).unit();
 
             amrex::Real cl, cd;
             amrex::Real lift, drag, qval;
@@ -164,7 +214,7 @@ struct ComputeForceOp<
             }
 
             // Assign values for output
-            wdata.vel_rel[ip] = wvel;
+            wdata.vel_rel[ip] = windvector;
             wdata.aoa[ip] = amr_wind::utils::degrees(aoa);
             wdata.cl[ip] = cl;
             wdata.cd[ip] = cd;

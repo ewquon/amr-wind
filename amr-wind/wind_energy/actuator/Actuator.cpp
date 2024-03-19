@@ -1,5 +1,4 @@
 #include "amr-wind/wind_energy/actuator/Actuator.H"
-#include "amr-wind/wind_energy/actuator/ActuatorModel.H"
 #include "amr-wind/wind_energy/actuator/ActParser.H"
 #include "amr-wind/wind_energy/actuator/ActuatorContainer.H"
 #include "amr-wind/CFDSim.H"
@@ -71,6 +70,13 @@ void Actuator::post_init_actions()
 
     for (auto& act : m_actuators) {
         act->init_actuator_source();
+    }
+
+    // Ensure velocity fills ghost cells prior to sampling
+    auto& vel = m_sim.repo().get_field("velocity");
+    for (int lev = 0; lev < m_sim.repo().num_active_levels(); ++lev) {
+        // Just need the interior velocity ghost cells updated
+        vel(lev).FillBoundary(m_sim.mesh().Geom()[lev].periodicity());
     }
 
     setup_container();
@@ -408,6 +414,34 @@ void Actuator::post_advance_work()
             ac->write_outputs();
         }
     }
+}
+
+ActuatorModel& Actuator::get_act_bylabel(const std::string& actlabel) const
+{
+    int thisid = 0; // Default to first actuator
+    for (const auto& act : m_actuators) {
+        std::string thislabel = act->label();
+        if (thislabel == actlabel) {
+            thisid = act->id();
+        }
+    }
+
+    return *m_actuators.at(thisid);
+}
+
+template <typename T>
+T* Actuator::get_actuator(std::string& key) const
+{
+    for (const auto& act : m_actuators) {
+        std::string thislabel = act->label();
+        if (thislabel == key) {
+            int thisid = act->id();
+            T* converted = dynamic_cast<T*>(*m_actuators.at(thisid));
+            return converted;
+        }
+    }
+
+    amrex::Abort("Could not find actuator");
 }
 
 } // namespace amr_wind::actuator

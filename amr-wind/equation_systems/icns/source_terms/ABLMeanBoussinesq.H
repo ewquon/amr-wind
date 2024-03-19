@@ -7,7 +7,7 @@
 
 namespace amr_wind::pde::icns {
 
-/** Boussinesq bouyancy source term
+/** Boussinesq buoyancy source term
  *  \ingroup icns_src we_abl
  *
  *  \f[
@@ -53,7 +53,7 @@ private:
     bool m_const_profile{false};
 
     //! Read a temperature profile from a text file
-    void read_temperature_profile(std::string profile_file_name);
+    void read_temperature_profile(const std::string& profile_file_name);
 };
 } // namespace amr_wind::pde::icns
 

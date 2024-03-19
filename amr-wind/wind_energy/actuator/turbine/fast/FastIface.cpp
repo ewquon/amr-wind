@@ -134,6 +134,17 @@ void FastIface::init_solution(const int local_id)
     fi.is_solution0 = false;
 }
 
+void FastIface::get_hub_stats(const int local_id)
+{
+    BL_PROFILE("amr-wind::FastIface::get_hub_stats");
+
+    auto& fi = *m_turbine_data[local_id];
+
+    fast_func(
+        FAST_HubPosition, &fi.tid_local, fi.hub_abs_pos, fi.hub_rot_vel,
+        fi.hub_orient);
+}
+
 void FastIface::advance_turbine(const int local_id)
 {
     BL_PROFILE("amr-wind::FastIface::advance_turbine");
@@ -160,7 +171,8 @@ void FastIface::advance_turbine(const int local_id)
         fast_func(FAST_OpFM_Step, &fi.tid_local);
     }
 
-    if ((fi.time_index / fi.num_substeps) % fi.chkpt_interval == 0) {
+    if (fi.chkpt_interval > 0 &&
+        (fi.time_index / fi.num_substeps) % fi.chkpt_interval == 0) {
         char rst_file[fast_strlen()];
         copy_filename(" ", rst_file);
         fast_func(FAST_CreateCheckpoint, &fi.tid_local, rst_file);
@@ -253,7 +265,7 @@ void FastIface::fast_init_turbine(FastTurbine& fi)
     }
 }
 
-// cppcheck-suppress constParameter
+// cppcheck-suppress constParameterReference
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void FastIface::fast_replay_turbine(FastTurbine& fi)
 {
@@ -301,7 +313,6 @@ void FastIface::fast_replay_turbine(FastTurbine& fi)
 #endif
 }
 
-// cppcheck-suppress constParameter
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void FastIface::fast_restart_turbine(FastTurbine& fi)
 {

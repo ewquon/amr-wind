@@ -24,6 +24,7 @@ template <typename Transport>
 class KOmegaSSTIDDES : public KOmegaSST<Transport>
 {
 public:
+    // cppcheck-suppress duplInheritedMember
     static std::string identifier()
     {
         return "KOmegaSSTIDDES-" + Transport::identifier();
@@ -60,6 +61,7 @@ protected:
     amrex::Real m_Ct{1.87};
     amrex::Real m_Cw{0.15};
     amrex::Real m_kappa{0.41};
+    amrex::Real m_sdr_prod_clip_factor{10.0};
 };
 
 } // namespace amr_wind::turbulence

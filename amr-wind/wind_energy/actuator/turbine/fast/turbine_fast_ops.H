@@ -165,7 +165,7 @@ struct InitDataOp<TurbineFast, SrcTrait>
             tdata.num_blades = sz_info[0];
             // back calculate what the value per blade for number of points in
             // the openfast data structure
-            tdata.num_vel_pts_blade = sz_info[2] / tdata.num_blades - 1;
+            tdata.num_vel_pts_blade = sz_info[2] / tdata.num_blades;
             data.grid().resize(sz_info[1], sz_info[2]);
             tdata.chord.resize(sz_info[1]);
             tdata.num_pts_tower = sz_info[3];
@@ -439,6 +439,8 @@ struct ComputeForceOp<TurbineFast, SrcTrait>
         } else {
             meta.fast->advance_turbine(tf.tid_local);
         }
+
+        meta.fast->get_hub_stats(tf.tid_local);
 
         // Populate nacelle force into the OpenFAST data structure so that it
         // gets broadcasted to all influenced processes in subsequent scattering

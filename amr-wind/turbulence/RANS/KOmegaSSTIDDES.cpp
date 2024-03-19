@@ -19,6 +19,7 @@ template <typename Transport>
 KOmegaSSTIDDES<Transport>::~KOmegaSSTIDDES() = default;
 
 template <typename Transport>
+// cppcheck-suppress uninitMemberVar
 KOmegaSSTIDDES<Transport>::KOmegaSSTIDDES(CFDSim& sim)
     : KOmegaSST<Transport>(sim)
     , m_rans_ind(sim.repo().declare_field("rans_indicator", 1, 1, 1))
@@ -38,6 +39,7 @@ void KOmegaSSTIDDES<Transport>::parse_model_coeffs()
     pp.query("Ct", this->m_Ct);
     pp.query("Cw", this->m_Cw);
     pp.query("kappa", this->m_kappa);
+    pp.query("sdr_prod_clip_factor", this->m_sdr_prod_clip_factor);
 }
 
 template <typename Transport>
@@ -63,7 +65,8 @@ TurbulenceModel::CoeffsDictType KOmegaSSTIDDES<Transport>::model_coeffs() const
         {"Cl", this->m_Cl},
         {"Ct", this->m_Ct},
         {"Cw", this->m_Cw},
-        {"kappa", this->m_kappa}};
+        {"kappa", this->m_kappa},
+        {"sdr_prod_clip_factor", this->m_sdr_prod_clip_factor}};
 }
 
 template <typename Transport>
@@ -90,18 +93,17 @@ void KOmegaSSTIDDES<Transport>::update_turbulent_viscosity(
     const amrex::Real Ct = this->m_Ct;
     const amrex::Real Cw = this->m_Cw;
     const amrex::Real kappa = this->m_kappa;
+    const amrex::Real sdr_prod_clip_factor = this->m_sdr_prod_clip_factor;
 
     auto& mu_turb = this->mu_turb();
     auto lam_mu = (this->m_transport).mu();
     const auto& den = this->m_rho.state(fstate);
     const auto& tke = (*this->m_tke).state(fstate);
     const auto& sdr = (*this->m_sdr).state(fstate);
-    // cppcheck-suppress constVariable
-    auto& repo = mu_turb.repo();
+    const auto& repo = mu_turb.repo();
     const auto& geom_vec = repo.mesh().Geom();
     auto& tke_lhs = (this->m_sim).repo().get_field("tke_lhs_src_term");
     tke_lhs.setVal(0.0);
-    // cppcheck-suppress constVariable
     auto& sdr_lhs = (this->m_sim).repo().get_field("sdr_lhs_src_term");
 
     auto gradK = (this->m_sim.repo()).create_scratch_field(3, 0);
@@ -260,7 +262,7 @@ void KOmegaSSTIDDES<Transport>::update_turbulent_viscosity(
                         rho_arr(i, j, k) * alpha *
                         amrex::min<amrex::Real>(
                             tmp4 * tmp4,
-                            10.0 *
+                            sdr_prod_clip_factor *
                                 amrex::max<amrex::Real>(sdr_arr(i, j, k), 0.0) *
                                 std::sqrt(tke_arr(i, j, k)) / l_iddes);
 

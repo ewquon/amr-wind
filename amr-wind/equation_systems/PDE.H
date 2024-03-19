@@ -31,7 +31,7 @@ public:
     using SchemeType = Scheme;
 
     //! Unique identifier used to register and create this instance on-demand
-    //! through the factor iterface
+    //! through the factor interface
     static std::string identifier()
     {
         return PDE::pde_name() + "-" + Scheme::scheme_name();
@@ -75,14 +75,17 @@ public:
                 new TurbulenceOp<PDE>(m_sim.turbulence_model(), m_fields));
         }
 
-        bool variable_density =
+        const bool variable_density =
             (!m_sim.pde_manager().constant_density() ||
              m_sim.physics_manager().contains("MultiPhase"));
 
         m_adv_op.reset(new AdvectionOp<PDE, Scheme>(
             m_fields, need_solver_mask, variable_density,
-            m_sim.has_mesh_mapping()));
+            m_sim.has_mesh_mapping(), m_sim.is_anelastic()));
         m_src_op.init_source_terms(m_sim);
+
+        // Post-solve operations should also apply after initialization
+        m_post_solve_op(m_time.current_time());
     }
 
     //! Perform update actions after a regrid is performed
@@ -97,13 +100,18 @@ public:
                 m_fields, need_solver_mask, m_sim.has_mesh_mapping()));
         }
 
-        bool variable_density =
+        const bool variable_density =
             (!m_sim.pde_manager().constant_density() ||
              m_sim.physics_manager().contains("MultiPhase"));
 
         m_adv_op.reset(new AdvectionOp<PDE, Scheme>(
             m_fields, need_solver_mask, variable_density,
             m_sim.has_mesh_mapping()));
+            m_fields, need_solver_mask, variable_density,
+            m_sim.has_mesh_mapping(), m_sim.is_anelastic()));
+
+        // Post-solve operations should also apply after a regrid
+        m_post_solve_op(m_time.current_time());
     }
 
     //! Return the object holding the fields necessary for solving this PDE
