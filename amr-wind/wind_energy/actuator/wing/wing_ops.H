@@ -133,6 +133,9 @@ struct ComputeForceOp<
         const auto& chord = wdata.chord;
         const auto& time = data.sim().time();
 
+        bool force_override = false;
+        if (wdata.force_override_inp.size() > 0) force_override = true;
+
         // Move force points to location at n+1
         // Also, get velocity of actuator from n to n+1
         // (will be unchanged for "none" and "linear" motion)
@@ -166,18 +169,6 @@ struct ComputeForceOp<
             const auto aoa = std::atan2(windvector[2], windvector[0]) +
                              amr_wind::utils::radians(wdata.pitch);
 
-<<<<<<< HEAD
-=======
-            // Make up some Cl, Cd values
-            amrex::Real cl, cd;
-            aflookup(aoa, cl, cd);
-
-            // Assume unit chord
-            const auto qval = 0.5 * vmag * vmag * chord[ip] * dx[ip];
-            const auto lift = qval * cl;
-            const auto drag = qval * cd;
-
->>>>>>> 0bf6748359c51fa1beb2b74832ed09d680cd0285
             // Determine unit vector parallel and perpendicular to velocity
             // vector
             // Directions

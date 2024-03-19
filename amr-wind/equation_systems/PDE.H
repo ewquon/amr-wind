@@ -106,8 +106,6 @@ public:
 
         m_adv_op.reset(new AdvectionOp<PDE, Scheme>(
             m_fields, need_solver_mask, variable_density,
-            m_sim.has_mesh_mapping()));
-            m_fields, need_solver_mask, variable_density,
             m_sim.has_mesh_mapping(), m_sim.is_anelastic()));
 
         // Post-solve operations should also apply after a regrid
