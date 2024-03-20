@@ -35,14 +35,11 @@ static inline void zero_adjacent_cell_vel(
     //const auto plo = geom[lev].ProbLoArray();
     //const auto dx = geom[lev].CellSizeArray();
 
+    // Note: We should only set vel_arr(i,j,k,n) and not the ghost cells within
+    // this ParallelFor, otherwise FillBoundary will not work as expected.
     const auto& bx = mfi.tilebox();
-
     amrex::ParallelFor(bx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            // Note: We should only set vel_arr(i,j,k,n) and not the ghost
-            // cells within this ParallelFor, otherwise FillBoundary will not
-            // work as expected.
-
             if (xf_mask_arr(i,j,k)==0) {
                 // cell is on +x side of thin body, surface is at low face
                 vel_corr_arr(i,j,k,0) -= 0.5*(vel_arr(i-1,j,k,0)
@@ -95,9 +92,9 @@ static inline void zero_surface_face_vel(
     const FieldRepo& repo,
     int lev,
     amrex::MFIter& mfi,
-    const amrex::Array4<amrex::Real>& vel_x_arr,
-    const amrex::Array4<amrex::Real>& vel_y_arr,
-    const amrex::Array4<amrex::Real>& vel_z_arr)
+    const amrex::Array4<amrex::Real>& umac_arr,
+    const amrex::Array4<amrex::Real>& vmac_arr,
+    const amrex::Array4<amrex::Real>& wmac_arr)
 {
     const auto& xface_mask = repo.get_int_field("mom_xface_mask");
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
@@ -113,15 +110,18 @@ static inline void zero_surface_face_vel(
 
     amrex::ParallelFor(xbx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            vel_x_arr(i,j,k) *= xf_mask_arr(i,j,k);
+            umac_arr(i,j,k) *= xf_mask_arr(i,j,k);
         });
     amrex::ParallelFor(ybx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            vel_y_arr(i,j,k) *= yf_mask_arr(i,j,k);
+            vmac_arr(i,j,k) *= yf_mask_arr(i,j,k);
         });
     amrex::ParallelFor(zbx,
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
-            vel_z_arr(i,j,k) *= zf_mask_arr(i,j,k);
+            //if ((j==0) && (zf_mask_arr(i,j,k) == 0)) {
+            //    amrex::AllPrint()<<"zeroed wmac"<<amrex::IntVect(i,j,k)<<"="<<wmac_arr(i,j,k)<<std::endl;
+            //}
+            wmac_arr(i,j,k) *= zf_mask_arr(i,j,k);
         });
 }
 

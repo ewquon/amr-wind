@@ -305,6 +305,7 @@ void incflo::ApplyProjection(
             // need adjacent cell velocities from ghost cells
             velocity(lev).FillBoundary(geom[lev].periodicity());
 
+// TODO: Is this necessary? IIRC, this seems to adversely affect performance
 //            for (amrex::MFIter mfi(velocity(lev), amrex::TilingIfNotGPU());
 //                 mfi.isValid(); ++mfi) {
 //                amr_wind::thinbody::zero_adjacent_cell_vel(

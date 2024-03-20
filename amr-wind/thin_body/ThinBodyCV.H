@@ -32,6 +32,9 @@ static inline void sum_momentum_fluxes(
 
     amrex::ParallelFor(bx, ndim,
         [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) noexcept {
+            //if ((j==0) && (n==0) && (zf_mask_arr(i,j,k)==0)) {
+            //    amrex::AllPrint()<<"(after mac proj) fluxz"<<amrex::IntVect(i,j,k)<<"="<<flux_z_arr(i,j,k)<<std::endl;
+            //}
             flux_sum_arr(i, j, k, n) =
                 + xf_mask_arr(i+1,j  ,k  ) * flux_x_arr(i+1,j  ,k  , n)
                 - xf_mask_arr(i  ,j  ,k  ) * flux_x_arr(i  ,j  ,k  , n)
