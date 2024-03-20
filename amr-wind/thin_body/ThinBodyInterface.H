@@ -20,6 +20,10 @@ static inline void zero_adjacent_cell_vel(
     // bf=1:   subtract opposing cell value
     const amrex::Real bf = 0.5;
 
+    // one-sided approach -- pressure-side normal velocity is unchanged; only
+    // correct the opposite cell
+    const bool onesided = true;
+
     const auto& xface_mask = repo.get_int_field("mom_xface_mask");
     const auto& yface_mask = repo.get_int_field("mom_yface_mask");
     const auto& zface_mask = repo.get_int_field("mom_zface_mask");
@@ -48,35 +52,55 @@ static inline void zero_adjacent_cell_vel(
         [=] AMREX_GPU_DEVICE(int i, int j, int k) noexcept {
             if (xf_mask_arr(i,j,k)==0) {
                 // cell is on +x side of thin body, surface is at low face
-                vel_corr_arr(i,j,k,0) = vel_corr_arr(i,  j,k,0)
-                                    -    bf *vel_arr(i-1,j,k,0)
-                                    - (1-bf)*vel_arr(i  ,j,k,0);
+                amrex::Real uerr =    bf *vel_arr(i-1,j,k,0)
+                                 + (1-bf)*vel_arr(i  ,j,k,0);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,0) -= uerr;
+                } else if (uerr > 0) {
+                    vel_corr_arr(i,j,k,0) -= (vel_arr(i-1,j,k,0) + vel_arr(i,j,k,0));
+                }
             }
             else if (xf_mask_arr(i+1,j,k)==0) {
                 // cell is on -x side of thin body, surface is at high face
-                vel_corr_arr(i,j,k,0) = vel_corr_arr(i  ,j,k,0)
-                                    - (1-bf)*vel_arr(i  ,j,k,0)
-                                    -    bf *vel_arr(i+1,j,k,0);
+                amrex::Real uerr = (1-bf)*vel_arr(i  ,j,k,0)
+                                 +    bf *vel_arr(i+1,j,k,0);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,0) -= uerr;
+                } else if (uerr < 0) {
+                    vel_corr_arr(i,j,k,0) -= (vel_arr(i,j,k,0) + vel_arr(i+1,j,k,0));
+                }
             }
 
             if (yf_mask_arr(i,j,k)==0) {
                 // cell is on +y side of thin body, surface is at low face
-                vel_corr_arr(i,j,k,1) = vel_corr_arr(i,j  ,k,1)
-                                    -    bf *vel_arr(i,j-1,k,1)
-                                    - (1-bf)*vel_arr(i,j  ,k,1);
+                amrex::Real verr =    bf *vel_arr(i,j-1,k,1)
+                                 + (1-bf)*vel_arr(i,j  ,k,1);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,1) -= verr;
+                } else if (verr > 0) {
+                    vel_corr_arr(i,j,k,1) -= (vel_arr(i,j-1,k,1) + vel_arr(i,j,k,1));
+                }
             }
             else if (yf_mask_arr(i,j+1,k)==0) {
                 // cell is on -y side of thin body, surface is at high face
-                vel_corr_arr(i,j,k,1) = vel_corr_arr(i,j  ,k,1)
-                                    - (1-bf)*vel_arr(i,j  ,k,1)
-                                    -    bf *vel_arr(i,j+1,k,1);
+                amrex::Real verr = (1-bf)*vel_arr(i,j  ,k,1)
+                                 +    bf *vel_arr(i,j+1,k,1);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,1) -= verr;
+                } else if (verr < 0) {
+                    vel_corr_arr(i,j,k,1) -= (vel_arr(i,j,k,1) + vel_arr(i,j+1,k,1));
+                }
             }
 
             if (zf_mask_arr(i,j,k)==0) {
                 // cell is on +z side of thin body, surface is at low face
-                vel_corr_arr(i,j,k,2) =  vel_corr_arr(i,j,k  ,2)
-                                     -    bf *vel_arr(i,j,k-1,2)
-                                     - (1-bf)*vel_arr(i,j,k  ,2);
+                amrex::Real werr =    bf *vel_arr(i,j,k-1,2)
+                                 + (1-bf)*vel_arr(i,j,k  ,2);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,2) -= werr;
+                } else if (werr > 0) {
+                    vel_corr_arr(i,j,k,2) -= (vel_arr(i,j,k-1,2) + vel_arr(i,j,k,2));
+                }
                 //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<" at k)"
                 //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","
                 //                << plo[1]+(j+0.5)*dx[1] <<","
@@ -86,9 +110,13 @@ static inline void zero_adjacent_cell_vel(
             }
             else if (zf_mask_arr(i,j,k+1)==0) {
                 // cell is on -z side of thin body, surface is at high face
-                vel_corr_arr(i,j,k,2) = vel_corr_arr(i,j,k  ,2)
-                                    - (1-bf)*vel_arr(i,j,k  ,2)
-                                    -    bf *vel_arr(i,j,k+1,2);
+                amrex::Real werr = (1-bf)*vel_arr(i,j,k  ,2)
+                                 +    bf *vel_arr(i,j,k+1,2);
+                if (!onesided) {
+                    vel_corr_arr(i,j,k,2) -= werr;
+                } else if (werr < 0) {
+                    vel_corr_arr(i,j,k,2) -= (vel_arr(i,j,k,2) + vel_arr(i,j,k+1,2));
+                }
                 //amrex::AllPrint() << "Applying interface conditions (lev="<<lev<<" at k+1)"
                 //    << " at ("  << plo[0]+(i+0.5)*dx[0] <<","<<
                 //                   plo[1]+(j+0.5)*dx[1] <<","<<
